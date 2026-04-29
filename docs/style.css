@@ -1,0 +1,125 @@
+body {
+  background: #1a1a1a;
+  color: #d0d0d0;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 2.5rem;
+}
+
+h1, h2, h3, h4 {
+  color: #f0f0f0;
+  margin-top: 2rem;
+}
+
+h1 { border-bottom: 2px solid #444; padding-bottom: 0.4rem; }
+h2 { border-bottom: 1px solid #333; padding-bottom: 0.3rem; }
+
+a { color: #5bb8ff; }
+a:visited { color: #9a80d4; }
+
+code {
+  background: #2a2a2a;
+  color: #e0e0e0;
+  padding: 0.15em 0.4em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+pre {
+  background: #242424;
+  border: 1px solid #383838;
+  border-radius: 5px;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+}
+
+table {
+  border-collapse: collapse;
+  width: auto;
+  max-width: 100%;
+  margin: 1rem 0;
+  table-layout: auto;
+}
+
+col { width: auto !important; }
+
+th {
+  background: #2c2c2c;
+  color: #e0e0e0;
+  border: 1px solid #444;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+td {
+  border: 1px solid #383838;
+  padding: 0.5rem 0.75rem;
+}
+
+td:first-child {
+  white-space: nowrap;
+}
+
+tr:nth-child(even) td { background: #222; }
+
+blockquote {
+  border-left: 3px solid #555;
+  margin: 0;
+  padding: 0.5rem 1rem;
+  color: #aaa;
+  background: #212121;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid #333;
+  margin: 2rem 0;
+}
+
+figure {
+  margin: 0.5rem 0;
+}
+
+img {
+  width: 100%;
+  display: block;
+  border-radius: 4px;
+  margin: 0;
+}
+
+figcaption {
+  text-align: right;
+  color: #d0d0d0;
+  padding-top: 0.2em;
+}
+
+figure:has(img[alt="UTC範囲入力"]),
+figure:has(img[alt*="Off Time"]),
+figure:has(img[alt="SkookumNet接続パネル"]),
+figure:has(img[alt="ログ管理パネル"]),
+figure:has(img[alt="UTC range input"]),
+figure:has(img[alt="SkookumNet connection panel"]),
+figure:has(img[alt="Log management panel"]) {
+  width: fit-content;
+  max-width: 100%;
+}
+
+img[alt="UTC範囲入力"],
+img[alt*="Off Time"],
+img[alt="SkookumNet接続パネル"],
+img[alt="ログ管理パネル"],
+img[alt="UTC range input"],
+img[alt="SkookumNet connection panel"],
+img[alt="Log management panel"] {
+  width: auto;
+  max-width: 100%;
+}

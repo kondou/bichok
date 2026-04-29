@@ -1,0 +1,64 @@
+[MESSAGES CONTROL]
+# Disable checks that produce false positives for PyObjC code:
+#
+# no-name-in-module: MultipeerConnectivity and Foundation symbols exist at
+#   runtime via PyObjC but pylint cannot introspect Objective-C frameworks.
+#
+# attribute-defined-outside-init: PyObjC classes use initWithX_ / initWithCoder_
+#   as the designated initializer instead of __init__.
+#
+# no-member: objc.super() and other PyObjC runtime helpers are not visible to
+#   pylint's static analysis.
+#
+# arguments-renamed: initWithCoder_ overrides legitimately rename the coder
+#   parameter; this is a PyObjC convention, not a bug.
+#
+# too-many-arguments / too-many-positional-arguments: MCSession and
+#   MCNearbyServiceAdvertiser delegate methods have fixed Objective-C signatures
+#   that cannot be shortened.
+#
+# unused-argument: stub delegate methods (didReceiveStream, didFinishReceiving,
+#   etc.) must accept the full Objective-C signature even when the body is a
+#   no-op; renaming args to _ would break PyObjC selector dispatch.
+#
+# too-many-instance-attributes: Exchange, PeerInformation, and TransientQso each
+#   hold 12-13 fields because they mirror NSCoding keys defined in SkookumLogger
+#   verbatim; splitting the classes would break the archive format.
+#
+# consider-using-with: the subprocess log file handle in skookumnet_client.main is
+#   opened before the event loop and must remain open until after it exits;
+#   a 'with' block cannot span the AppHelper.runConsoleEventLoop() call.
+#
+# fixme: FIXME comments in this codebase document known protocol limitations
+#   (e.g. single-peer assumption in requestAllQSOs) that require SkookumLogger
+#   changes to resolve; suppressing the warning avoids noise without hiding the
+#   documentation.
+disable=no-name-in-module,
+        attribute-defined-outside-init,
+        no-member,
+        arguments-renamed,
+        too-many-arguments,
+        too-many-positional-arguments,
+        unused-argument,
+        too-many-instance-attributes,
+        consider-using-with,
+        fixme
+
+max-line-length=125
+
+[BASIC]
+# Allow any identifier that starts with a letter or underscore.  This covers:
+#   - CamelCase module names  (TransientQso, SkookumNet, …)
+#   - camelCase PyObjC selectors  (session_peer_didChangeState_, …)
+#   - camelCase attributes that mirror NSCoding keys  (peerHostName, timeStamp, …)
+#   - camelCase packet-tag constants copied from SkookumLogger  (GabPacketTag, …)
+#   - Mixed-case flag constants  (QSOFlagsMaskViable, …)
+#   - Class names with underscores  (MacLoggerDX_ADIF_Importer)
+module-rgx=[a-zA-Z_][a-zA-Z0-9_]*
+class-rgx=[a-zA-Z_][a-zA-Z0-9_]*
+method-rgx=[a-zA-Z_][a-zA-Z0-9_]*
+function-rgx=[a-zA-Z_][a-zA-Z0-9_]*
+argument-rgx=[a-zA-Z_][a-zA-Z0-9_]*
+attr-rgx=[a-zA-Z_][a-zA-Z0-9_]*
+variable-rgx=[a-zA-Z_][a-zA-Z0-9_]*
+const-rgx=[a-zA-Z_][a-zA-Z0-9_]*

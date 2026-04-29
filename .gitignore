@@ -1,0 +1,22 @@
+# Python / SkookumNet (not published)
+plugins/
+skookumnet_client.py
+SkookumNet.py
+read_chat.py
+start_skookumnet.command
+pyproject.toml
+uv.lock
+__pycache__/
+skookumnet.ini
+skookumnet-client/
+skookumnet-client
+
+# Log files
+*.log
+
+# Internal / work files
+internals/
+makefile
+contest_log_analyzer_working.html
+*.txt
+TODO
