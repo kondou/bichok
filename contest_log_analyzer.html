@@ -67,6 +67,31 @@ header {
   .stat-label { color: rgba(0,0,0,0.65); }
 }
 
+@media (max-width: 640px) {
+  header {
+    flex-wrap: wrap;
+    padding: 6px 10px;
+    gap: 4px;
+  }
+  #header-title-wrap {
+    position: static !important;
+    transform: none !important;
+    left: auto !important;
+    flex: 1 1 100%;
+    justify-content: center;
+    order: -1;
+  }
+  .header-right {
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: flex-end;
+  }
+  .header-right .btn, .header-right label.btn {
+    font-size: 10px !important;
+    padding: 3px 6px !important;
+  }
+}
+
 .header-right {
   display: flex;
   gap: 8px;
@@ -405,7 +430,7 @@ body.compact #compact-btn { opacity: 1; color: var(--accent); border-color: var(
   <div class="header-left">
     <span class="app-sub" id="format-label">Cabrillo / ADIF</span>
   </div>
-  <div style="position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;">
+  <div id="header-title-wrap" style="position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;">
     <span class="app-title" id="contest-title">Contest Log Analyzer</span>
   </div>
   <div class="header-right">
