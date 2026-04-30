@@ -972,8 +972,9 @@ let sharedCrosshairMs = null; // 両グラフ共有の時刻(ms)
 let _tooltipAutoHideTimer = null;
 let _suppressTooltip = false; // external callback によるツールチップ再表示を抑制するフラグ
 
-let _dbgTraceNext = false; // hide後の最初のshow呼び出しでtraceを取る
+let _dbgTraceNext = false;
 function _hideSharedTooltip() {
+  console.log('[hide] FIRED schedCount=', _schedCount);
   if (_tooltipAutoHideTimer) { clearTimeout(_tooltipAutoHideTimer); _tooltipAutoHideTimer = null; }
   sharedCrosshairMs = null;
   _suppressTooltip = true;
@@ -986,7 +987,10 @@ function _hideSharedTooltip() {
   console.log('[hide] after dispatch: suppress=', _suppressTooltip, 'sharedMs=', sharedCrosshairMs, 'lastEvent=', cumulChart?._lastEvent?.type);
 }
 
+let _schedCount = 0;
 function _scheduleTooltipHide(ms) {
+  _schedCount++;
+  if (_schedCount <= 3 || _schedCount % 60 === 0) console.trace('[sched#' + _schedCount + '] called ms=' + ms);
   if (_tooltipAutoHideTimer) clearTimeout(_tooltipAutoHideTimer);
   _tooltipAutoHideTimer = setTimeout(_hideSharedTooltip, ms || 5000);
 }
