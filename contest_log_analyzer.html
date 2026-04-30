@@ -69,6 +69,7 @@ header {
 }
 
 @media (max-width: 640px) {
+  body { overflow-x: hidden; }
   header {
     flex-wrap: wrap;
     padding: 6px 10px;
@@ -541,7 +542,7 @@ body.compact #compact-btn { opacity: 1; color: var(--accent); border-color: var(
   <div class="ctrl-group" style="gap:8px;">
     <span class="ctrl-label" data-i18n="rightRate" data-i18n-title="rateWindowTitle" title="">ベースレート</span>
     <input type="range" id="rate-window" min="1" max="7200" value="600" step="1"
-      style="width:480px; accent-color:#5DCAA5;">
+      style="flex:1;min-width:60px;max-width:480px;accent-color:#5DCAA5;">
     <input type="text" id="rate-window-label" value="10:00" style="font-size:11px;color:var(--text2);width:44px;background:transparent;border:none;border-bottom:1px solid var(--text2);text-align:center;outline:none;padding:0;cursor:text;">
     <button class="btn" id="rate-window-reset" data-i18n-title="rateWindowReset" style="font-size:18px; line-height:1; padding:2px 8px;">↺</button>
   </div>
@@ -6501,7 +6502,7 @@ function _createLivePane(winMs) {
           style="font-size:11px;color:var(--text2);width:40px;background:transparent;border:none;border-bottom:1px solid var(--text2);text-align:center;outline:none;padding:0;cursor:text;">
         <span style="font-size:10px;color:#5DCAA5;" data-i18n="rightRate">${i18n('rightRate')}</span>
         <input type="range" class="pane-rate-slider" min="1" max="7200" step="1" value="600"
-          style="width:200px;accent-color:#5DCAA5;">
+          style="flex:1;min-width:40px;max-width:200px;accent-color:#5DCAA5;">
         <input type="text" class="pane-rate-label" value="10:00"
           style="font-size:11px;color:var(--text2);width:44px;background:transparent;border:none;border-bottom:1px solid var(--text2);text-align:center;outline:none;padding:0;cursor:text;">
         <button class="btn pane-mode-btn" style="font-size:10px;padding:1px 7px;" title="${i18n('live3hModeTitle')}">${i18n('live3hScroll')}</button>
