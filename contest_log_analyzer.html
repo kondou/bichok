@@ -3319,7 +3319,7 @@ function renderCharts(qsos) {
           ticks: {
             stepSize: tickStepMs,
             font: { size: 10, family: 'SF Mono, Fira Code, monospace' },
-            color: _isDark() ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.65)',
+            color: 'rgba(255,255,255,0.65)',
             padding: 2 + Math.max(1, _multiOpSegments.length) * 6,
             callback: v => { const d = new Date(v); return String(d.getUTCHours()).padStart(2,'0') + ':' + String(d.getUTCMinutes()).padStart(2,'0'); }
           },
@@ -3660,7 +3660,7 @@ function renderCharts(qsos) {
           ticks: {
             stepSize: tickStepMs,
             font: { size: 10, family: 'SF Mono, Fira Code, monospace' },
-            color: _isDark() ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.65)',
+            color: 'rgba(255,255,255,0.65)',
             callback: v => { const d = new Date(v); return String(d.getUTCHours()).padStart(2,'0') + ':' + String(d.getUTCMinutes()).padStart(2,'0'); }
           },
           grid: { display: false },
@@ -3673,10 +3673,10 @@ function renderCharts(qsos) {
           grace: 0,
           bounds: 'ticks',
           afterFit(scale) { scale.width = 52; scale.paddingBottom = 0; scale.paddingTop = 0; },
-          ticks: { font: { size: 10 }, color: _isDark() ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.65)', maxTicksLimit: 6 },
+          ticks: { font: { size: 10 }, color: 'rgba(255,255,255,0.65)', maxTicksLimit: 6 },
           grid: { color: 'rgba(255,255,255,0.05)' },
           border: { color: 'rgba(255,255,255,0.1)' },
-          title: { display: true, text: i18n('yAxisQso'), font: { size: 10 }, color: _isDark() ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.65)' }
+          title: { display: true, text: i18n('yAxisQso'), font: { size: 10 }, color: 'rgba(255,255,255,0.65)' }
         },
         yRight: {
           position: 'right',
@@ -5423,7 +5423,7 @@ function _renderCombinedOverlay(chart, ctx, ca, dMin, dMax) {
     ctx.font = '9px "SF Mono", "Fira Code", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = _isDark() ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.65)';
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
     for (let t = firstTick; t <= dMax + 1; t += stepMs) {
       const px = getX(t);
       if (px < ca.left - 1 || px > ca.right + 1) continue;
@@ -5709,7 +5709,7 @@ function _renderBandOverlay(chart, ctx, ca, dMin, dMax) {
     ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1; ctx.setLineDash([]);
     ctx.font = '9px "SF Mono", "Fira Code", monospace';
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillStyle = _isDark() ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.65)';
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
     for (let t = firstTick; t <= dMax + 1; t += stepMs) {
       const px = getX(t);
       if (px < ca.left - 1 || px > ca.right + 1) continue;
@@ -5776,7 +5776,7 @@ function _renderBandOverlay(chart, ctx, ca, dMin, dMax) {
   }
   ctx.save();
   ctx.font = '10px "SF Mono","Fira Code",monospace';
-  ctx.fillStyle = _isDark() ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.75)';
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   ctx.fillText(i18n('rateLabel'), ca.left + 6, ca.top + 10);
   ctx.restore();
@@ -6525,9 +6525,9 @@ function _createLivePane(winMs) {
         y: {
           min: 0, max: 10,
           afterFit(scale) { scale.width = 52; },
-          ticks: { maxTicksLimit: 4, font: { size: 9 }, color: isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.65)' },
+          ticks: { maxTicksLimit: 4, font: { size: 9 }, color: 'rgba(255,255,255,0.65)' },
           grid: { color: 'rgba(255,255,255,0.05)' }, border: { color: 'rgba(255,255,255,0.1)' },
-          title: { display: true, text: i18n('yAxisQso'), font: { size: 9 }, color: isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.65)' },
+          title: { display: true, text: i18n('yAxisQso'), font: { size: 9 }, color: 'rgba(255,255,255,0.65)' },
         },
         yRight: {
           position: 'right', min: 0, max: 10,
