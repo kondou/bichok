@@ -1042,10 +1042,11 @@ const crosshairPlugin = {
       if (cumulChart && cumulChart !== chart) cumulChart.draw();
       if (rateChart && rateChart !== chart) rateChart.draw();
       if (!chart._isLiveChart) chart.draw();
-      _scheduleTooltipHide(5000);
+      _scheduleTooltipHide(3000);
     } else if (e.type === 'mouseout') {
       if (_tooltipAutoHideTimer) { clearTimeout(_tooltipAutoHideTimer); _tooltipAutoHideTimer = null; }
       sharedCrosshairMs = null;
+      _suppressTooltip = true;
       const _tip = document.getElementById('bar-tooltip');
       if (_tip) _tip.style.display = 'none';
       if (cumulChart && cumulChart !== chart) cumulChart.draw();
@@ -3742,7 +3743,7 @@ function renderCharts(qsos) {
     const t = e.touches[0];
     rateCanvas.dispatchEvent(new MouseEvent('mousemove', { clientX: t.clientX, clientY: t.clientY - 60, bubbles: false }));
   }, { passive: false });
-  rateCanvas.addEventListener('touchend', () => _scheduleTooltipHide(5000));
+  rateCanvas.addEventListener('touchend', () => _scheduleTooltipHide(3000));
 
   rateBarsPlugin = {
     id: 'rateBars',
@@ -6898,7 +6899,7 @@ function _createLivePane(winMs) {
   }, { passive: false });
   el.addEventListener('touchend', () => {
     _liveState[id].cursorFrac = null;
-    _scheduleTooltipHide(5000);
+    _scheduleTooltipHide(3000);
   });
 
   // ---- ツールバーボタン ----
