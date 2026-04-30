@@ -1034,8 +1034,8 @@ const crosshairPlugin = {
   },
   afterEvent(chart, args) {
     const e = args.event;
+    console.log('[ae]', e.type, 'replay=', args.replay, 'liveChart=', !!chart._isLiveChart);
     if (e.type === 'mousemove') {
-      console.log('[ae] mousemove replay=', args.replay, 'inArea=', args.inChartArea);
       if (args.replay) return; // chart.update()によるリプレイイベントは無視
       _suppressTooltip = false; // 新しいインタラクションでフラグをリセット
       if (chart.scales && chart.scales.x) {
