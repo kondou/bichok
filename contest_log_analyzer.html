@@ -972,27 +972,19 @@ let sharedCrosshairMs = null; // 両グラフ共有の時刻(ms)
 let _tooltipAutoHideTimer = null;
 let _suppressTooltip = false; // external callback によるツールチップ再表示を抑制するフラグ
 
-let _dbgTraceNext = false;
 function _hideSharedTooltip() {
-  console.log('[hide] FIRED schedCount=', _schedCount);
   if (_tooltipAutoHideTimer) { clearTimeout(_tooltipAutoHideTimer); _tooltipAutoHideTimer = null; }
   sharedCrosshairMs = null;
   _suppressTooltip = true;
-  _dbgTraceNext = true;
   const tip = document.getElementById('bar-tooltip');
   if (tip) tip.style.display = 'none';
-  console.log('[hide] suppress=', _suppressTooltip, 'sharedMs=', sharedCrosshairMs, 'lastEvent=', cumulChart?._lastEvent?.type);
   try { if (typeof cumulChart !== 'undefined' && cumulChart) cumulChart.canvas.dispatchEvent(new MouseEvent('mouseout', {bubbles: false})); } catch(e_) {}
   try { if (typeof rateChart  !== 'undefined' && rateChart)  rateChart.canvas.dispatchEvent(new MouseEvent('mouseout', {bubbles: false})); } catch(e_) {}
-  console.log('[hide] after dispatch: suppress=', _suppressTooltip, 'sharedMs=', sharedCrosshairMs, 'lastEvent=', cumulChart?._lastEvent?.type);
 }
 
-let _schedCount = 0;
 function _scheduleTooltipHide(ms) {
-  _schedCount++;
-  if (_schedCount <= 3 || _schedCount % 60 === 0) console.trace('[sched#' + _schedCount + '] called ms=' + ms);
   if (_tooltipAutoHideTimer) clearTimeout(_tooltipAutoHideTimer);
-  _tooltipAutoHideTimer = setTimeout(_hideSharedTooltip, ms || 5000);
+  _tooltipAutoHideTimer = setTimeout(_hideSharedTooltip, ms || 3000);
 }
 
 const crosshairPlugin = {
@@ -1040,9 +1032,9 @@ const crosshairPlugin = {
     } catch(e) {}
   },
   afterEvent(chart, args) {
+    if (args.replay) return; // chart.update()によるリプレイイベントは無視
     const e = args.event;
     if (e.type === 'mousemove') {
-      if (_suppressTooltip) { console.log('[mm] resetting suppress, chart=', chart._isLiveChart ? 'live' : 'cumul/rate'); console.trace('[mm] stack'); }
       _suppressTooltip = false; // 新しいインタラクションでフラグをリセット
       if (chart.scales && chart.scales.x) {
         sharedCrosshairMs = chart.scales.x.getValueForPixel(e.x);
@@ -3388,11 +3380,6 @@ function renderCharts(qsos) {
             const tip = document.getElementById('bar-tooltip');
             if (!tip) return;
             if (tooltip.opacity === 0 || _suppressTooltip || sharedCrosshairMs === null) { tip.style.display = 'none'; return; }
-            if (_dbgTraceNext) {
-              _dbgTraceNext = false;
-              console.log('[ext] SHOW after hide: opacity=', tooltip.opacity, 'suppress=', _suppressTooltip, 'sharedMs=', sharedCrosshairMs, 'lastEvent=', chart._lastEvent?.type);
-              console.trace('[ext] call stack');
-            }
             const timeMs = sharedCrosshairMs;
             const d_ = new Date(timeMs);
             const ts = [d_.getUTCHours(), d_.getUTCMinutes(), d_.getUTCSeconds()].map(v => String(v).padStart(2,'0')).join(':');
