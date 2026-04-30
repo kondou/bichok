@@ -28,6 +28,7 @@ body {
   font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
   font-size: 13px;
   height: 100vh;
+  height: 100svh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -89,6 +90,31 @@ header {
   .header-right .btn, .header-right label.btn {
     font-size: 10px !important;
     padding: 3px 6px !important;
+  }
+
+  /* 統計バー：縦幅を半減 */
+  .stat-cell {
+    padding: 4px 8px;
+  }
+  .stat-value {
+    font-size: 13px;
+  }
+
+  /* コントロールバー：パディング・ギャップを縮小 */
+  .controls {
+    padding: 5px 10px;
+    gap: 8px;
+  }
+
+  /* シミュレーションバー：縦幅を縮小 */
+  #sim-bar {
+    padding: 3px 10px !important;
+    gap: 6px !important;
+  }
+
+  /* 全体グラフに最小高さを確保 */
+  #cumul-section {
+    min-height: 180px;
   }
 }
 
