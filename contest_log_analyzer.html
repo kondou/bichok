@@ -973,7 +973,6 @@ let _tooltipAutoHideTimer = null;
 let _suppressTooltip = false; // external callback によるツールチップ再表示を抑制するフラグ
 
 function _hideSharedTooltip() {
-  console.log('[hide] FIRED');
   if (_tooltipAutoHideTimer) { clearTimeout(_tooltipAutoHideTimer); _tooltipAutoHideTimer = null; }
   sharedCrosshairMs = null;
   _suppressTooltip = true;
@@ -1033,10 +1032,9 @@ const crosshairPlugin = {
     } catch(e) {}
   },
   afterEvent(chart, args) {
+    if (args.replay) return; // chart.update()によるリプレイは無視
     const e = args.event;
-    console.log('[ae]', e.type, 'replay=', args.replay, 'liveChart=', !!chart._isLiveChart);
-    if (e.type === 'mousemove') {
-      if (args.replay) return; // chart.update()によるリプレイイベントは無視
+    if (e.type === 'mousemove' || e.type === 'mousedown') { // chart.update()によるリプレイイベントは無視
       _suppressTooltip = false; // 新しいインタラクションでフラグをリセット
       if (chart.scales && chart.scales.x) {
         sharedCrosshairMs = chart.scales.x.getValueForPixel(e.x);
@@ -1059,7 +1057,6 @@ const crosshairPlugin = {
   }
 };
 Chart.register(crosshairPlugin);
-console.log('DBG_VERSION_2');
 
 const BAND_COLORS = {
   '160':'#534AB7','80':'#1D9E75','60':'#2E8B57','40':'#D85A30','30':'#8B6914',
