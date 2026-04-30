@@ -970,16 +970,16 @@ Chart.register(live3hZoomPlugin);
 
 let sharedCrosshairMs = null; // 両グラフ共有の時刻(ms)
 let _tooltipAutoHideTimer = null;
+let _suppressTooltip = false; // external callback によるツールチップ再表示を抑制するフラグ
 
 function _hideSharedTooltip() {
   if (_tooltipAutoHideTimer) { clearTimeout(_tooltipAutoHideTimer); _tooltipAutoHideTimer = null; }
   sharedCrosshairMs = null;
+  _suppressTooltip = true;
   const tip = document.getElementById('bar-tooltip');
   if (tip) tip.style.display = 'none';
-  // chart.draw() → tooltip.draw() → external callback が opacity>0 なら tooltip を再表示するため
-  // opacity を 0 にリセットしてから描画する
-  try { if (typeof cumulChart !== 'undefined' && cumulChart) { if (cumulChart.tooltip) cumulChart.tooltip.opacity = 0; cumulChart.draw(); } } catch(e_) {}
-  try { if (typeof rateChart  !== 'undefined' && rateChart)  { if (rateChart.tooltip)  rateChart.tooltip.opacity  = 0; rateChart.draw();  } } catch(e_) {}
+  try { if (typeof cumulChart !== 'undefined' && cumulChart) cumulChart.draw(); } catch(e_) {}
+  try { if (typeof rateChart  !== 'undefined' && rateChart)  rateChart.draw();  } catch(e_) {}
 }
 
 function _scheduleTooltipHide(ms) {
@@ -1034,6 +1034,7 @@ const crosshairPlugin = {
   afterEvent(chart, args) {
     const e = args.event;
     if (e.type === 'mousemove') {
+      _suppressTooltip = false; // 新しいインタラクションでフラグをリセット
       if (chart.scales && chart.scales.x) {
         sharedCrosshairMs = chart.scales.x.getValueForPixel(e.x);
       }
@@ -3375,7 +3376,7 @@ function renderCharts(qsos) {
             const {chart, tooltip} = context;
             const tip = document.getElementById('bar-tooltip');
             if (!tip) return;
-            if (tooltip.opacity === 0) { tip.style.display = 'none'; return; }
+            if (tooltip.opacity === 0 || _suppressTooltip) { tip.style.display = 'none'; return; }
             const timeMs = sharedCrosshairMs !== null ? sharedCrosshairMs :
               (chart.scales && chart.scales.x ? chart.scales.x.getValueForPixel(tooltip.caretX) : null);
             if (!timeMs) { tip.style.display = 'none'; return; }
@@ -3443,7 +3444,7 @@ function renderCharts(qsos) {
             const cr = chart.canvas.getBoundingClientRect();
             const _tipX = cr.left + tooltip.caretX;
             const _tipW = tip.offsetWidth;
-            tip.style.left = (_tipX + 14 + _tipW < window.innerWidth ? _tipX + 14 : _tipX - _tipW - 12) + 'px';
+            tip.style.left = Math.max(4, _tipX + 14 + _tipW < window.innerWidth ? _tipX + 14 : _tipX - _tipW - 12) + 'px';
             tip.style.top  = (cr.top  + tooltip.caretY - 20) + 'px';
           }
         }
@@ -3728,7 +3729,8 @@ function renderCharts(qsos) {
     }).join('<br>');
     barTooltipEl.innerHTML = `<div style="color:#8a8a88;margin-bottom:2px;">${lbl}${timeStr} UTC</div>${rows}<div style="border-top:0.5px solid rgba(255,255,255,0.1);margin-top:4px;padding-top:4px;">${lbl}${i18n('totalTooltip', totalQso, totalRate)}</div>`;
     barTooltipEl.style.display = 'block';
-    barTooltipEl.style.left = (e.clientX + 12) + 'px';
+    const _rtW = barTooltipEl.offsetWidth;
+    barTooltipEl.style.left = Math.max(4, e.clientX + 12 + _rtW < window.innerWidth ? e.clientX + 12 : e.clientX - _rtW - 12) + 'px';
     barTooltipEl.style.top  = (e.clientY - 20) + 'px';
   });
   rateCanvas.addEventListener('mouseleave', () => {
@@ -6778,7 +6780,7 @@ function _createLivePane(winMs) {
     tip.innerHTML = `<div style="color:#8a8a88;margin-bottom:2px;">${ts} UTC</div>${tipLines.join('<br>')}`;
     tip.style.display = 'block';
     const _lTipW = tip.offsetWidth;
-    tip.style.left = (e.clientX + 12 + _lTipW < window.innerWidth ? e.clientX + 12 : e.clientX - _lTipW - 12) + 'px';
+    tip.style.left = Math.max(4, e.clientX + 12 + _lTipW < window.innerWidth ? e.clientX + 12 : e.clientX - _lTipW - 12) + 'px';
     tip.style.top  = (e.clientY - 20) + 'px';
   });
   mainCanvas.addEventListener('mouseleave', () => {
@@ -6872,7 +6874,7 @@ function _createLivePane(winMs) {
     tip.innerHTML = `<div style="color:#8a8a88;margin-bottom:2px;">${lbl}${timeStr} UTC</div>${bandRow}<span style="color:#8a8a88;"> (計 ${totalRate})</span>`;
     tip.style.display = 'block';
     const _bTipW = tip.offsetWidth;
-    tip.style.left = (e.clientX + 12 + _bTipW < window.innerWidth ? e.clientX + 12 : e.clientX - _bTipW - 12) + 'px';
+    tip.style.left = Math.max(4, e.clientX + 12 + _bTipW < window.innerWidth ? e.clientX + 12 : e.clientX - _bTipW - 12) + 'px';
     tip.style.top  = (e.clientY - 20) + 'px';
   });
   bandCanvas.addEventListener('mouseleave', () => {
