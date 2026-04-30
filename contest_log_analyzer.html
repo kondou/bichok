@@ -3378,10 +3378,8 @@ function renderCharts(qsos) {
             const {chart, tooltip} = context;
             const tip = document.getElementById('bar-tooltip');
             if (!tip) return;
-            if (tooltip.opacity === 0 || _suppressTooltip) { tip.style.display = 'none'; return; }
-            const timeMs = sharedCrosshairMs !== null ? sharedCrosshairMs :
-              (chart.scales && chart.scales.x ? chart.scales.x.getValueForPixel(tooltip.caretX) : null);
-            if (!timeMs) { tip.style.display = 'none'; return; }
+            if (tooltip.opacity === 0 || _suppressTooltip || sharedCrosshairMs === null) { tip.style.display = 'none'; return; }
+            const timeMs = sharedCrosshairMs;
             const d_ = new Date(timeMs);
             const ts = [d_.getUTCHours(), d_.getUTCMinutes(), d_.getUTCSeconds()].map(v => String(v).padStart(2,'0')).join(':');
             const bsearch = arr => {
