@@ -978,8 +978,10 @@ function _hideSharedTooltip() {
   _suppressTooltip = true;
   const tip = document.getElementById('bar-tooltip');
   if (tip) tip.style.display = 'none';
-  try { if (typeof cumulChart !== 'undefined' && cumulChart) { cumulChart.tooltip.setActiveElements([], {x:0,y:0}); cumulChart.draw(); } } catch(e_) {}
-  try { if (typeof rateChart  !== 'undefined' && rateChart)  { rateChart.tooltip.setActiveElements([], {x:0,y:0}); rateChart.draw(); } } catch(e_) {}
+  // mouseout を dispatch して Chart.js の _lastEvent をクリア（これをしないと
+  // update() のたびに _lastEvent から tooltip が再起動する）
+  try { if (typeof cumulChart !== 'undefined' && cumulChart) cumulChart.canvas.dispatchEvent(new MouseEvent('mouseout', {bubbles: false})); } catch(e_) {}
+  try { if (typeof rateChart  !== 'undefined' && rateChart)  rateChart.canvas.dispatchEvent(new MouseEvent('mouseout', {bubbles: false})); } catch(e_) {}
 }
 
 function _scheduleTooltipHide(ms) {
