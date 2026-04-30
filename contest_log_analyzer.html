@@ -112,10 +112,6 @@ header {
     gap: 6px !important;
   }
 
-  /* 全体グラフに最小高さを確保 */
-  #cumul-section {
-    min-height: 180px;
-  }
 }
 
 .header-right {
@@ -599,7 +595,7 @@ body.compact #compact-btn { opacity: 1; color: var(--accent); border-color: var(
       <button class="btn" id="full-chart-log-btn" data-i18n-title="paneLogSelTitle" style="display:none;font-size:10px;padding:1px 7px;" title="表示ログを選択">All</button>
       <span style="font-size:10px;color:var(--text2);">｜</span>
       <span style="font-size:10px;color:#5DCAA5;" data-i18n="rightRate" data-i18n-title="rateWindowTitle" title="">ベースレート</span>
-      <input type="range" id="rate-window-full" min="1" max="7200" value="600" step="1" style="width:480px;accent-color:#5DCAA5;">
+      <input type="range" id="rate-window-full" min="1" max="7200" value="600" step="1" style="flex:1;min-width:60px;max-width:480px;accent-color:#5DCAA5;">
       <input type="text" id="rate-window-label-full" value="10:00" style="font-size:11px;color:var(--text2);width:44px;background:transparent;border:none;border-bottom:1px solid var(--text2);text-align:center;outline:none;padding:0;cursor:text;">
 <button class="btn" id="reset-zoom-btn" data-i18n="resetZoom">ズームリセット</button>
     </div>
@@ -4698,6 +4694,10 @@ document.getElementById('session-save-btn').addEventListener('click', _saveSessi
 document.getElementById('session-restore-btn').addEventListener('click', _restoreSession);
 document.getElementById('compact-btn').addEventListener('click', () => {
   document.body.classList.toggle('compact');
+  requestAnimationFrame(() => {
+    if (cumulChart) cumulChart.resize();
+    if (rateChart) rateChart.resize();
+  });
 });
 
 // 保存済み設定を復元（const宣言完了後に呼ぶ）
