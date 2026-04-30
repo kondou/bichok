@@ -220,6 +220,7 @@ body.compact #compact-btn { opacity: 1; color: var(--accent); border-color: var(
   position: relative;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .chart-wrap.rate-wrap {
@@ -4698,6 +4699,10 @@ document.getElementById('compact-btn').addEventListener('click', () => {
   requestAnimationFrame(() => {
     if (cumulChart) cumulChart.resize();
     if (rateChart) rateChart.resize();
+    for (const p of _livePanes) {
+      if (p.chart) p.chart.resize();
+      if (p.bandChart) p.bandChart.resize();
+    }
   });
 });
 
