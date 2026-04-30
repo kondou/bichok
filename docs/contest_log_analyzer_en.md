@@ -33,7 +33,7 @@ Pronounced *bikhɔ́k* — **B**utt **I**n **C**hair, **H**ands **O**n **K**eybo
 
 ---
 
-## 1. Glossary
+## 1. Glossary {#1-glossary}
 
 Technical terms used throughout this document. Refer back here as needed.
 
@@ -118,7 +118,7 @@ Technical terms used throughout this document. Refer back here as needed.
 
 ---
 
-## 2. Getting Started
+## 2. Getting Started {#2-getting-started}
 
 Open `contest_log_analyzer.html` in a browser — no internet connection, installation, or server required. (SkookumNet live connection requires being on the same Layer-2 network as SkookumLogger.)
 
@@ -151,7 +151,7 @@ For detailed SkookumNet startup instructions → [§17 SkookumNet Live Connectio
 
 ---
 
-## 3. Loading a Log
+## 3. Loading a Log {#3-loading-a-log}
 
 Load a log using any of the methods below, or connect via SkookumNet live (→ [connection instructions](#17-skookumnet-live-connection)).
 
@@ -185,7 +185,7 @@ The **↺** button (top right) reloads the last opened file — useful after edi
 
 ---
 
-## 4. Interface Overview
+## 4. Interface Overview {#4-interface-overview}
 
 ![Screen after loading a log](images/en/A-2.png)
 
@@ -203,7 +203,7 @@ The screen is laid out top to bottom as follows.
 
 ---
 
-## 5. Stats Bar
+## 5. Stats Bar {#5-stats-bar}
 
 After loading a log, key statistics appear near the top of the screen.
 
@@ -227,7 +227,7 @@ Click the **Doc** button (top right) to open this manual in a new tab. The manua
 
 ---
 
-## 6. Display Mode
+## 6. Display Mode {#6-display-mode}
 
 Select the active view using the **View** group at the left end of the control bar.
 
@@ -241,7 +241,7 @@ Select the active view using the **View** group at the left end of the control b
 
 ---
 
-## 7. Main Chart
+## 7. Main Chart {#7-main-chart}
 
 ![Main chart](images/en/C-1.png)
 
@@ -276,7 +276,7 @@ When comparing multiple logs, each log's values are shown on separate lines labe
 
 ---
 
-## 8. Band Breakdown Chart
+## 8. Band Breakdown Chart {#8-band-breakdown-chart}
 
 Turn on **+Bands** to display a stacked bar chart below the main chart (and below the pane, if visible). When the band breakdown chart is shown, time slot buttons appear at the very bottom of the screen. Click any button to change the slot width.
 
@@ -310,7 +310,7 @@ When the pane is visible, enabling **+Bands** also adds a band breakdown chart b
 
 ---
 
-## 9. Mode Bar Colors
+## 9. Mode Bar Colors {#9-mode-bar-colors}
 
 The **mode bar** is the thin color-coded strip along the bottom of the main chart and panes. It shows the detected operating mode at each point in time. The bar is linked to the time axis; color transitions mark changes in operating mode. The legend below the chart shows labels for each mode, and — in WPX and WAE contests — the total accumulated Off Time.
 
@@ -330,7 +330,7 @@ The **mode bar** is the thin color-coded strip along the bottom of the main char
 
 ---
 
-## 10. Trend Overlays (Rate / EMA / LOESS / ACCEL)
+## 10. Trend Overlays (Rate / EMA / LOESS / ACCEL) {#10-trend-overlays-rate--ema--loess--accel}
 
 Trend curves overlaid on the main chart. Click each button to toggle it on or off.
 
@@ -349,7 +349,7 @@ Each log is automatically assigned a distinct color. The reference log (REF) tre
 
 ---
 
-## 11. Base Rate
+## 11. Base Rate {#11-base-rate}
 
 The QSO/h rate is computed over a sliding time window called the base rate.
 
@@ -367,7 +367,7 @@ Each pane can also have its own independent base rate setting (→ [Pane View](#
 
 ---
 
-## 12. UTC Range and Contest Start/End
+## 12. UTC Range and Contest Start/End {#12-utc-range-and-contest-startend}
 
 Use the **UTC** fields on the right side of the control bar to manually set the contest start and end times.
 
@@ -393,7 +393,7 @@ In the log management panel (→ [Loading Multiple Logs](#15-loading-multiple-lo
 
 ---
 
-## 13. Off Time Skip
+## 13. Off Time Skip {#13-off-time-skip}
 
 When Off Time is detected in a WPX or WAE contest log, an **Off Time** toggle button appears in the control bar.
 
@@ -413,7 +413,7 @@ Click the button to toggle.
 
 ---
 
-## 14. Simulation Playback
+## 14. Simulation Playback {#14-simulation-playback}
 
 After loading a log, a **simulation bar** appears below the stats bar. It replays the log along the time axis — showing how cumulative QSOs, rate, and operating mode would have appeared as the contest unfolded in real time. The band breakdown chart, if visible, is also animated. The simulation bar is hidden when a SkookumNet live connection is active.
 
@@ -430,7 +430,7 @@ The main chart and pane update in real time as playback progresses.
 
 ---
 
-## 15. Loading Multiple Logs
+## 15. Loading Multiple Logs {#15-loading-multiple-logs}
 
 ![Multi-log main chart](images/en/I-1.png)
 
@@ -467,7 +467,7 @@ Click the **All** button in the top right of the main chart to open a dropdown f
 
 ---
 
-## 16. Pane View (Rolling Window)
+## 16. Pane View (Rolling Window) {#16-pane-view-rolling-window}
 
 Click the **Pane** button to add a rolling-window pane showing the most recent N hours of QSOs at an expanded scale. Particularly useful for real-time monitoring during a SkookumNet live session.
 
@@ -506,7 +506,7 @@ Use **+ Pane** to display several panes at once — for example, one showing all
 
 ---
 
-## 17. SkookumNet Live Connection
+## 17. SkookumNet Live Connection {#17-skookumnet-live-connection}
 
 Receive and display SkookumLogger's SkookumNet packets in real time.
 
@@ -560,7 +560,7 @@ Multiple panes can be used simultaneously — one showing the combined total, ot
 
 ---
 
-## 18. Save / Restore Session
+## 18. Save / Restore Session {#18-save--restore-session}
 
 Save the currently loaded logs and settings to the browser, and restore them on next launch.
 
@@ -581,7 +581,7 @@ What is saved:
 
 ---
 
-## 19. Grid Locator
+## 19. Grid Locator {#19-grid-locator}
 
 Enter a grid locator (e.g., `PM52HV`) in the **Grid** field of the control bar to display sunrise/sunset information as a background tint on the pane and main chart. The tinted background indicates daylight hours; sunrise and sunset times are shown in a deeper orange.
 
@@ -591,7 +591,7 @@ Enter a grid locator (e.g., `PM52HV`) in the **Grid** field of the control bar t
 
 ---
 
-## 20. Language
+## 20. Language {#20-language}
 
 Use the **EN** / **JA** button (top right) to switch between English and Japanese.
 
@@ -600,7 +600,7 @@ Use the **EN** / **JA** button (top right) to switch between English and Japanes
 
 ---
 
-## 21. Zoom and Pan
+## 21. Zoom and Pan {#21-zoom-and-pan}
 
 Both the main chart and panes support zoom and pan.
 
@@ -612,7 +612,7 @@ Both the main chart and panes support zoom and pan.
 
 ---
 
-## 22. Troubleshooting
+## 22. Troubleshooting {#22-troubleshooting}
 
 ### Chart does not appear
 - Verify that `chart.min.js` is in the same folder as `contest_log_analyzer.html`.
