@@ -1034,6 +1034,7 @@ const crosshairPlugin = {
   afterEvent(chart, args) {
     const e = args.event;
     if (e.type === 'mousemove') {
+      if (_suppressTooltip) console.log('[mm] mousemove resetting suppress');
       _suppressTooltip = false; // 新しいインタラクションでフラグをリセット
       if (chart.scales && chart.scales.x) {
         sharedCrosshairMs = chart.scales.x.getValueForPixel(e.x);
@@ -3440,6 +3441,7 @@ function renderCharts(qsos) {
               }
             }
             if (!lines.length) { tip.style.display = 'none'; return; }
+            console.log('[ext] showing tip opacity=', tooltip.opacity, 'suppress=', _suppressTooltip, 'sharedMs=', sharedCrosshairMs);
             tip.innerHTML = `<div style="color:#8a8a88;margin-bottom:2px;">${ts} UTC</div>${lines.join('<br>')}`;
             tip.style.display = 'block';
             const cr = chart.canvas.getBoundingClientRect();
