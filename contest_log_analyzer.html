@@ -6381,8 +6381,9 @@ function _rafLiveDraw(key, combined, band, nowMs) {
     if (c._liveBandData) c._liveBandData.nowMs = nowMs;
     if (c._bgReady) {
       const ctx = c.ctx, cw = c.canvas.width, ch = c.canvas.height;
+      const _dpr = window.devicePixelRatio || 1;
       ctx.globalCompositeOperation = 'copy';
-      ctx.drawImage(c._bgCanvas, 0, 0, cw, ch);
+      ctx.drawImage(c._bgCanvas, 0, 0, cw / _dpr, ch / _dpr);
       ctx.globalCompositeOperation = 'source-over';
       const ca = c.chartArea;
       if (ca) {
