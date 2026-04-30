@@ -973,6 +973,7 @@ let _tooltipAutoHideTimer = null;
 let _suppressTooltip = false; // external callback によるツールチップ再表示を抑制するフラグ
 
 function _hideSharedTooltip() {
+  console.log('[hide] FIRED');
   if (_tooltipAutoHideTimer) { clearTimeout(_tooltipAutoHideTimer); _tooltipAutoHideTimer = null; }
   sharedCrosshairMs = null;
   _suppressTooltip = true;
@@ -1032,9 +1033,10 @@ const crosshairPlugin = {
     } catch(e) {}
   },
   afterEvent(chart, args) {
-    if (args.replay) return; // chart.update()によるリプレイイベントは無視
     const e = args.event;
     if (e.type === 'mousemove') {
+      console.log('[ae] mousemove replay=', args.replay, 'inArea=', args.inChartArea);
+      if (args.replay) return; // chart.update()によるリプレイイベントは無視
       _suppressTooltip = false; // 新しいインタラクションでフラグをリセット
       if (chart.scales && chart.scales.x) {
         sharedCrosshairMs = chart.scales.x.getValueForPixel(e.x);
