@@ -870,6 +870,73 @@ const dragZoomPlugin = {
         chart.draw();
       }
     });
+
+    // タッチ対応: 水平スワイプでドラッグズーム
+    canvas.addEventListener('touchstart', e => {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      const x = t.clientX - rect.left;
+      const y = t.clientY - rect.top;
+      const ca = chart.chartArea;
+      if (!ca || x < ca.left || x > ca.right || y > ca.bottom) return;
+      chart._touchZoomPending = { startClientX: t.clientX, startClientY: t.clientY, startX: x };
+      e.preventDefault(); // テキスト選択・ゴーストマウスイベントを防ぐ
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', e => {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (chart._touchZoomPending && !(dragZoomState.active && dragZoomState.chart === chart)) {
+        const dx = Math.abs(t.clientX - chart._touchZoomPending.startClientX);
+        const dy = Math.abs(t.clientY - chart._touchZoomPending.startClientY);
+        if (dx < 8 && dy < 8) return;
+        if (dx > dy) {
+          const ca = chart.chartArea;
+          const x = chart._touchZoomPending.startX;
+          let startMs;
+          if (chart._isLiveChart && chart._drawXMin !== undefined) {
+            startMs = chart._drawXMin + (x - ca.left) / (ca.right - ca.left) * (chart._drawXMax - chart._drawXMin);
+          } else if (chart.scales && chart.scales.x) {
+            startMs = chart.scales.x.getValueForPixel(x);
+          }
+          if (startMs !== undefined) dragZoomState = { active: true, chart, startX: x, startMs };
+        }
+        chart._touchZoomPending = null;
+      }
+      if (!dragZoomState.active || dragZoomState.chart !== chart) return;
+      chart._dragX = t.clientX - canvas.getBoundingClientRect().left;
+      if (!chart._isLiveChart) chart.draw();
+      e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', e => {
+      chart._touchZoomPending = null;
+      if (!dragZoomState.active || dragZoomState.chart !== chart) return;
+      const t = e.changedTouches[0];
+      const rect = canvas.getBoundingClientRect();
+      const ca = chart.chartArea;
+      const endX = t.clientX - rect.left;
+      let endMs;
+      if (chart._isLiveChart && chart._drawXMin !== undefined && ca) {
+        endMs = chart._drawXMin + (endX - ca.left) / (ca.right - ca.left) * (chart._drawXMax - chart._drawXMin);
+      } else if (chart.scales && chart.scales.x) {
+        endMs = chart.scales.x.getValueForPixel(endX);
+      }
+      const rawMs1 = Math.min(dragZoomState.startMs, endMs);
+      const rawMs2 = Math.max(dragZoomState.startMs, endMs);
+      chart._dragX = null;
+      dragZoomState = { active: false };
+      if (chart._isLiveChart) {
+        if (rawMs2 - rawMs1 >= 60000) _setLiveZoom(chart._liveKey, { min: rawMs1, max: rawMs2 });
+        chart.draw();
+        return;
+      }
+      const ms1 = Math.max(rawMs1, globalStartMs);
+      const ms2 = Math.min(rawMs2, globalEndMs);
+      if (Math.abs(ms2 - ms1) < 60000) { chart.draw(); return; }
+      applyZoom(ms1, ms2);
+    });
   },
 
   afterDraw(chart) {
@@ -902,6 +969,23 @@ const live3hZoomPlugin = {
 Chart.register(live3hZoomPlugin);
 
 let sharedCrosshairMs = null; // 両グラフ共有の時刻(ms)
+let _tooltipAutoHideTimer = null;
+
+function _hideSharedTooltip() {
+  if (_tooltipAutoHideTimer) { clearTimeout(_tooltipAutoHideTimer); _tooltipAutoHideTimer = null; }
+  sharedCrosshairMs = null;
+  const tip = document.getElementById('bar-tooltip');
+  if (tip) tip.style.display = 'none';
+  // chart.draw() → tooltip.draw() → external callback が opacity>0 なら tooltip を再表示するため
+  // opacity を 0 にリセットしてから描画する
+  try { if (typeof cumulChart !== 'undefined' && cumulChart) { if (cumulChart.tooltip) cumulChart.tooltip.opacity = 0; cumulChart.draw(); } } catch(e_) {}
+  try { if (typeof rateChart  !== 'undefined' && rateChart)  { if (rateChart.tooltip)  rateChart.tooltip.opacity  = 0; rateChart.draw();  } } catch(e_) {}
+}
+
+function _scheduleTooltipHide(ms) {
+  if (_tooltipAutoHideTimer) clearTimeout(_tooltipAutoHideTimer);
+  _tooltipAutoHideTimer = setTimeout(_hideSharedTooltip, ms || 5000);
+}
 
 const crosshairPlugin = {
   id: 'crosshair',
@@ -953,12 +1037,16 @@ const crosshairPlugin = {
       if (chart.scales && chart.scales.x) {
         sharedCrosshairMs = chart.scales.x.getValueForPixel(e.x);
       }
-      // 両グラフを再描画（ライブチャートはRAPループが担当するためスキップ）
+      // 両グラフを再描画（ライブチャートはRAFループが担当するためスキップ）
       if (cumulChart && cumulChart !== chart) cumulChart.draw();
       if (rateChart && rateChart !== chart) rateChart.draw();
       if (!chart._isLiveChart) chart.draw();
+      _scheduleTooltipHide(5000);
     } else if (e.type === 'mouseout') {
+      if (_tooltipAutoHideTimer) { clearTimeout(_tooltipAutoHideTimer); _tooltipAutoHideTimer = null; }
       sharedCrosshairMs = null;
+      const _tip = document.getElementById('bar-tooltip');
+      if (_tip) _tip.style.display = 'none';
       if (cumulChart && cumulChart !== chart) cumulChart.draw();
       if (rateChart && rateChart !== chart) rateChart.draw();
       if (!chart._isLiveChart) chart.draw();
@@ -3646,6 +3734,13 @@ function renderCharts(qsos) {
   rateCanvas.addEventListener('mouseleave', () => {
     barTooltipEl.style.display = 'none';
   });
+  rateCanvas.addEventListener('touchmove', e => {
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    rateCanvas.dispatchEvent(new MouseEvent('mousemove', { clientX: t.clientX, clientY: t.clientY - 60, bubbles: false }));
+  }, { passive: false });
+  rateCanvas.addEventListener('touchend', () => _scheduleTooltipHide(5000));
 
   rateBarsPlugin = {
     id: 'rateBars',
@@ -6784,6 +6879,24 @@ function _createLivePane(winMs) {
     _liveState[id].cursorFrac = null;
     const tip = document.getElementById('bar-tooltip');
     if (tip) tip.style.display = 'none';
+  });
+  // ---- ペイン全体タッチ: Y座標でmain/bandを判定してツールチップを表示 ----
+  el.addEventListener('touchmove', e => {
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    const mainRect = mainCanvas.getBoundingClientRect();
+    const bandRect  = bandCanvas.getBoundingClientRect();
+    // Y位置でどのキャンバスか判定（バンドキャンバスが非表示なら mainCanvas にフォールバック）
+    if (bandChart && bandRect.height > 0 && t.clientY >= bandRect.top && t.clientY <= bandRect.bottom) {
+      bandCanvas.dispatchEvent(new MouseEvent('mousemove', { clientX: t.clientX, clientY: t.clientY - 60, bubbles: false }));
+    } else if (t.clientY >= mainRect.top && t.clientY <= mainRect.bottom) {
+      mainCanvas.dispatchEvent(new MouseEvent('mousemove', { clientX: t.clientX, clientY: t.clientY - 60, bubbles: false }));
+    }
+  }, { passive: false });
+  el.addEventListener('touchend', () => {
+    _liveState[id].cursorFrac = null;
+    _scheduleTooltipHide(5000);
   });
 
   // ---- ツールバーボタン ----
