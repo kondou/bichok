@@ -1151,6 +1151,8 @@ const I18N = {
     live3hModeTitle: '固定: グラフが右から左にシフト / 追随: グラフ固定+赤線が現時間に移動',
     winLabel: '時間幅',
     paneAdd: '＋ペイン',
+    paneTopHide: '▲ 隠す',
+    paneTopShow: '▼ 表示',
     logAdd: '＋ログ追加',
     logReplace: '置換して読み込む',
     logAppend: 'このログに追加する',
@@ -1255,6 +1257,8 @@ const I18N = {
     live3hModeTitle: 'Fixed: red line stays fixed, chart scrolls right-to-left / Follow: chart frozen, red line follows time',
     winLabel: 'Window',
     paneAdd: '+ Pane',
+    paneTopHide: '▲ Hide',
+    paneTopShow: '▼ Show',
     logAdd: '+ Add Log',
     logReplace: 'Replace Log',
     logAppend: 'Add to Comparison',
@@ -1357,6 +1361,11 @@ function applyLang() {
     }
     const paneAddBtn = document.getElementById('pane-add-btn');
     if (paneAddBtn) paneAddBtn.textContent = i18n('paneAdd');
+    const paneTopToggle = document.getElementById('pane-top-toggle');
+    if (paneTopToggle) {
+      const isHidden = document.body.classList.contains('pane-top-hidden');
+      paneTopToggle.textContent = isHidden ? i18n('paneTopShow') : i18n('paneTopHide');
+    }
   } catch(e) {}
   // ログ管理パネルを再描画（動的生成要素のi18n更新）
   try { if (typeof _renderLogPanel === 'function') _renderLogPanel(); } catch(e) {}
@@ -7075,9 +7084,10 @@ document.getElementById('pane-add-btn').addEventListener('click', () => {
   if (!isTouch) return;
 
   const toggleBtn = document.createElement('button');
+  toggleBtn.id = 'pane-top-toggle';
   toggleBtn.className = 'btn';
   toggleBtn.style.cssText = 'display:none;position:fixed;bottom:70px;left:10px;z-index:9999;font-size:12px;padding:4px 12px;';
-  toggleBtn.textContent = '▲ Hide';
+  toggleBtn.textContent = i18n('paneTopHide');
   document.body.appendChild(toggleBtn);
 
   const panesContainer = document.getElementById('live-panes-container');
@@ -7091,7 +7101,7 @@ document.getElementById('pane-add-btn').addEventListener('click', () => {
   }
   toggleBtn.addEventListener('click', () => {
     const hidden = document.body.classList.toggle('pane-top-hidden');
-    toggleBtn.textContent = hidden ? '▼ Show' : '▲ Hide';
+    toggleBtn.textContent = hidden ? i18n('paneTopShow') : i18n('paneTopHide');
   });
 })();
 
