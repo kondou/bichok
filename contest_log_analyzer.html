@@ -7077,7 +7077,7 @@ document.getElementById('pane-add-btn').addEventListener('click', () => {
   const toggleBtn = document.createElement('button');
   toggleBtn.className = 'btn';
   toggleBtn.style.cssText = 'display:none;position:fixed;bottom:70px;left:10px;z-index:9999;font-size:12px;padding:4px 12px;';
-  toggleBtn.textContent = '▲ 隠す';
+  toggleBtn.textContent = '▲ Hide';
   document.body.appendChild(toggleBtn);
 
   const panesContainer = document.getElementById('live-panes-container');
@@ -7091,7 +7091,7 @@ document.getElementById('pane-add-btn').addEventListener('click', () => {
   }
   toggleBtn.addEventListener('click', () => {
     const hidden = document.body.classList.toggle('pane-top-hidden');
-    toggleBtn.textContent = hidden ? '▼ 表示' : '▲ 隠す';
+    toggleBtn.textContent = hidden ? '▼ Show' : '▲ Hide';
   });
 })();
 
