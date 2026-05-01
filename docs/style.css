@@ -113,6 +113,20 @@ figure:has(img[alt="Log management panel"]) {
   max-width: 100%;
 }
 
+.screenshot-pair {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  margin: 1rem 0;
+}
+.screenshot-pair figure {
+  flex: 1;
+  margin: 0;
+}
+.screenshot-pair figcaption {
+  text-align: center;
+}
+
 img[alt="UTC範囲入力"],
 img[alt*="Off Time"],
 img[alt="SkookumNet接続パネル"],
