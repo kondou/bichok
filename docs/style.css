@@ -120,11 +120,16 @@ figure:has(img[alt="Log management panel"]) {
   margin: 1rem 0;
 }
 .screenshot-pair figure {
-  flex: 1;
+  flex: 0 0 auto;
+  width: 260px;
   margin: 0;
+}
+.screenshot-pair figure img {
+  width: 260px;
 }
 .screenshot-pair figcaption {
   text-align: center;
+  font-size: 0.85em;
 }
 
 img[alt="UTC範囲入力"],
