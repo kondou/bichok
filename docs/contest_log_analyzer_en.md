@@ -649,15 +649,15 @@ Works on iPhone (Safari) and other mobile browsers. Both portrait and landscape 
 
 ### Hide / Show button
 
-When the Pane View is active, a **「▲ 隠す」** button appears at the bottom-left of the screen. Tapping it hides the header, stats bar, and controls, giving the panes more vertical space. The **「▼ 表示」** button appears in the same position and restores the hidden elements.
+When the Pane View is active, a **▲ Hide** button appears at the bottom-left of the screen. Tapping it hides the header, stats bar, and controls, giving the panes more vertical space. The **▼ Show** button appears in the same position and restores the hidden elements.
 
 <div class="screenshot-pair">
 <figure>
-<img src="images/L-1.png" alt="Smartphone pane view — header visible">
+<img src="images/en/L-1.png" alt="Smartphone pane view — header visible">
 <figcaption>▲ Hide: header and controls visible</figcaption>
 </figure>
 <figure>
-<img src="images/L-2.png" alt="Smartphone pane view — header hidden">
+<img src="images/en/L-2.png" alt="Smartphone pane view — header hidden">
 <figcaption>▼ Show: header and controls hidden, panes maximised</figcaption>
 </figure>
 </div>
