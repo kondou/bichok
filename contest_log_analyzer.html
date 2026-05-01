@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Contest Log Analyzer [DBG-v1]</title>
+<title>Contest Log Analyzer</title>
 <script src="chart.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -643,8 +643,6 @@ body.compact #compact-btn { opacity: 1; color: var(--accent); border-color: var(
 <div id="bar-tooltip" style="display:none;position:fixed;background:#1a1a1c;border:0.5px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 10px;font-size:11px;color:#e8e8e6;pointer-events:none;z-index:100;line-height:1.6;"></div>
 
 <script>
-window.onerror = (msg, src, line, col) => console.log('[onerror]', msg, 'line:' + line);
-console.log('[SCRIPT START]');
 
 // グリッドロケーター -> 緯度経度
 function gridToLatLon(grid) {
@@ -7064,26 +7062,19 @@ document.getElementById('pane-add-btn').addEventListener('click', () => {
 
 // モバイル: 上部トグルボタン（ペインより上の領域を隠す/表示）
 (function() {
-  console.log('[toggle] IIFE start');
   const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-  console.log('[toggle] isTouch=' + isTouch + ' maxTouchPoints=' + navigator.maxTouchPoints);
-  if (!isTouch) { console.log('[toggle] not touch, abort'); return; }
+  if (!isTouch) return;
 
   const toggleBtn = document.createElement('button');
   toggleBtn.className = 'btn';
-  toggleBtn.style.cssText = 'display:none;position:fixed;bottom:10px;left:10px;z-index:9999;font-size:12px;padding:4px 12px;';
+  toggleBtn.style.cssText = 'display:none;position:fixed;bottom:70px;left:10px;z-index:9999;font-size:12px;padding:4px 12px;';
   toggleBtn.textContent = '▲ 隠す';
   document.body.appendChild(toggleBtn);
-  console.log('[toggle] btn created and appended');
 
   const panesContainer = document.getElementById('live-panes-container');
-  console.log('[toggle] panesContainer found=' + !!panesContainer + ' display=' + (panesContainer ? panesContainer.style.display : 'N/A'));
-
   function syncBtn() {
     const visible = panesContainer && panesContainer.style.display !== 'none';
     toggleBtn.style.display = visible ? '' : 'none';
-    const r = toggleBtn.getBoundingClientRect();
-    console.log('[toggle] syncBtn visible=' + visible + ' btn.display=' + toggleBtn.style.display + ' rect=' + JSON.stringify({l:Math.round(r.left),t:Math.round(r.top),w:Math.round(r.width),h:Math.round(r.height)}));
   }
   syncBtn();
   if (panesContainer) {
@@ -7117,7 +7108,6 @@ document.getElementById('reload-file-btn').addEventListener('click', () => {
 
 // ---- SkookumNet接続通知コピーボタン ----
 
-console.log('[SCRIPT END]');
 </script>
 </body>
 </html>
