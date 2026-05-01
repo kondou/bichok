@@ -30,6 +30,7 @@ Pronounced *bikhɔ́k* — **B**utt **I**n **C**hair, **H**ands **O**n **K**eybo
 20. [Language](#20-language)
 21. [Zoom and Pan](#21-zoom-and-pan)
 22. [Troubleshooting](#22-troubleshooting)
+23. [Using on a Smartphone](#23-using-on-a-smartphone)
 
 ---
 
@@ -134,8 +135,10 @@ Open `contest_log_analyzer.html` in a browser — no internet connection, instal
 
 **Log file analysis only (no SkookumNet)**
 ```
-contest_log_analyzer.html   ← open this in your browser
-chart.min.js                ← must be in the same folder (charting library)
+contest_log_analyzer.html    ← open this in your browser
+chart.min.js                 ← must be in the same folder (charting library)
+contest_log_analyzer_ja.html ← documentation (Japanese)
+contest_log_analyzer_en.html ← documentation (English)
 ```
 
 **With SkookumNet live connection (macOS only)**
@@ -637,3 +640,31 @@ Both the main chart and panes support zoom and pan.
 - Check the anchor (time reference point) setting in the log management panel.
 - If both logs are from the same contest, "Contest Start" is the standard anchor.
 - When comparing logs from different contest years or dates, "First QSO" is often easier to align with.
+
+---
+
+## 23. Using on a Smartphone {#23-using-on-a-smartphone}
+
+Works on iPhone (Safari) and other mobile browsers. Both portrait and landscape orientations are supported. The Compact mode (⊡ button) reduces on-screen clutter and is recommended for small screens.
+
+### Hide / Show button
+
+When the Pane View is active, a **「▲ 隠す」** button appears at the bottom-left of the screen. Tapping it hides the header, stats bar, and controls, giving the panes more vertical space. The **「▼ 表示」** button appears in the same position and restores the hidden elements.
+
+<div class="screenshot-pair">
+<figure>
+<img src="images/L-1.png" alt="Smartphone pane view — header visible">
+<figcaption>▲ Hide: header and controls visible</figcaption>
+</figure>
+<figure>
+<img src="images/L-2.png" alt="Smartphone pane view — header hidden">
+<figcaption>▼ Show: header and controls hidden, panes maximised</figcaption>
+</figure>
+</div>
+
+| Button | Action |
+|--------|--------|
+| **▲ Hide** | Hide header and controls, maximise pane area |
+| **▼ Show** | Restore header and controls |
+
+> This button appears only while the Pane View is active. It works in both portrait and landscape orientations.

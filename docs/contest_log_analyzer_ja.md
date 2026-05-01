@@ -139,13 +139,6 @@ contest_log_analyzer.html    ← ブラウザで開くとツールが動作
 chart.min.js                 ← 同じフォルダに必要（グラフ描画ライブラリ）
 contest_log_analyzer_ja.html ← 日本語のドキュメント
 contest_log_analyzer_en.html ← 英語のドキュメント
-docs/                        ← ドキュメントソースファイル一式
-  contest_log_analyzer_ja.md    ← 日本語ガイド（Markdown 原稿）
-  contest_log_analyzer_en.md    ← 英語ガイド（Markdown 原稿）
-  contest_log_analyzer_ja.html  ← 日本語ガイド（HTML 版）
-  contest_log_analyzer_en.html  ← 英語ガイド（HTML 版）
-  images/                       ← ガイド内スクリーンショット
-  style.css                     ← ドキュメント用スタイルシート
 ```
 
 **SkookumNet ライブ接続を使用する場合（macOS のみ）**
