@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Contest Log Analyzer</title>
+<title>Contest Log Analyzer [DBG-v1]</title>
 <script src="chart.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -67,6 +67,16 @@ header {
   .app-sub { color: rgba(0,0,0,0.7); }
   .stat-label { color: rgba(0,0,0,0.65); }
 }
+
+/* ペイン全画面モード：上部を非表示にしてペインに最大領域を与える */
+body.pane-top-hidden header,
+body.pane-top-hidden #stats-bar,
+body.pane-top-hidden #sim-bar,
+body.pane-top-hidden .controls,
+body.pane-top-hidden #log-panel {
+  display: none !important;
+}
+
 
 @media (max-width: 640px) {
   body { overflow-x: hidden; }
@@ -587,7 +597,7 @@ body.compact #compact-btn { opacity: 1; color: var(--accent); border-color: var(
   </div>
   <!-- ローリングウィンドウ ペインコンテナ -->
   <div id="live-panes-container" style="display:none; flex:1; min-height:0; flex-direction:column; overflow-y:auto; gap:4px;">
-    <div id="pane-add-wrap" style="display:flex;justify-content:flex-end;padding:2px 4px 0;flex-shrink:0;">
+    <div id="pane-add-wrap" style="display:flex;justify-content:flex-end;align-items:center;padding:2px 4px 0;flex-shrink:0;">
       <button class="btn" id="pane-add-btn" style="font-size:10px;padding:1px 8px;" data-i18n="paneAdd">＋ペイン</button>
     </div>
   </div>
@@ -633,6 +643,8 @@ body.compact #compact-btn { opacity: 1; color: var(--accent); border-color: var(
 <div id="bar-tooltip" style="display:none;position:fixed;background:#1a1a1c;border:0.5px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 10px;font-size:11px;color:#e8e8e6;pointer-events:none;z-index:100;line-height:1.6;"></div>
 
 <script>
+window.onerror = (msg, src, line, col) => console.log('[onerror]', msg, 'line:' + line);
+console.log('[SCRIPT START]');
 
 // グリッドロケーター -> 緯度経度
 function gridToLatLon(grid) {
@@ -5422,6 +5434,7 @@ function _startLiveAnimation() {
   if (_liveRafId) return;
   _liveLastDataUpdate = 0;
   let _lastWall = 0;
+  let _lastDrawWall = 0;
   function tick() {
     try {
       const wallNow = Date.now();
@@ -5443,8 +5456,12 @@ function _startLiveAnimation() {
         _liveLastDataUpdate = wallNow;
         updateLiveCharts();
       }
-      const nowMs = getNowMs();
-      for (const p of _livePanes) _rafLiveDraw(p.id, p.chart, p.bandChart, nowMs);
+      // 描画は30fps上限（発熱対策）
+      if (wallNow - _lastDrawWall >= 33) {
+        _lastDrawWall = wallNow;
+        const nowMs = getNowMs();
+        for (const p of _livePanes) _rafLiveDraw(p.id, p.chart, p.bandChart, nowMs);
+      }
     } catch (e) {
       console.error('[RAF tick error]', e);
     }
@@ -6715,7 +6732,7 @@ function _createLivePane(winMs) {
     const tip = document.getElementById('bar-tooltip');
     if (!ca || x < ca.left || x > ca.right) {
       _liveState[id].cursorFrac = null;
-      if (tip) tip.style.display = 'none';
+      // チャートエリア外でもツールチップは消さない（mouseleaveで消す）
       return;
     }
     const frac = (x - ca.left) / (ca.right - ca.left);
@@ -6787,8 +6804,10 @@ function _createLivePane(winMs) {
   });
   mainCanvas.addEventListener('mouseleave', () => {
     _liveState[id].cursorFrac = null;
-    const tip = document.getElementById('bar-tooltip');
-    if (tip) tip.style.display = 'none';
+    if (!_liveState[id]._inTouch) {
+      const tip = document.getElementById('bar-tooltip');
+      if (tip) tip.style.display = 'none';
+    }
   });
   mainCanvas.addEventListener('mousedown', e => {
     if (e.button !== 0) return;
@@ -6815,7 +6834,7 @@ function _createLivePane(winMs) {
     const tip = document.getElementById('bar-tooltip');
     if (!ca || mouseX < ca.left || mouseX > ca.right) {
       _liveState[id].cursorFrac = null;
-      if (tip) tip.style.display = 'none';
+      // チャートエリア外でもツールチップは消さない（mouseleaveで消す）
       return;
     }
     const frac = (mouseX - ca.left) / (ca.right - ca.left);
@@ -6881,8 +6900,10 @@ function _createLivePane(winMs) {
   });
   bandCanvas.addEventListener('mouseleave', () => {
     _liveState[id].cursorFrac = null;
-    const tip = document.getElementById('bar-tooltip');
-    if (tip) tip.style.display = 'none';
+    if (!_liveState[id]._inTouch) {
+      const tip = document.getElementById('bar-tooltip');
+      if (tip) tip.style.display = 'none';
+    }
   });
   // ---- ペイン全体タッチ: Y座標でmain/bandを判定してツールチップを表示 ----
   el.addEventListener('touchmove', e => {
@@ -6898,9 +6919,13 @@ function _createLivePane(winMs) {
       mainCanvas.dispatchEvent(new MouseEvent('mousemove', { clientX: t.clientX, clientY: t.clientY - 60, bubbles: false }));
     }
   }, { passive: false });
+  el.addEventListener('touchstart', () => {
+    _liveState[id]._inTouch = true;
+  }, { passive: true });
   el.addEventListener('touchend', () => {
     _liveState[id].cursorFrac = null;
     _scheduleTooltipHide(3000);
+    setTimeout(() => { _liveState[id]._inTouch = false; }, 400);
   });
 
   // ---- ツールバーボタン ----
@@ -7037,6 +7062,39 @@ document.getElementById('pane-add-btn').addEventListener('click', () => {
   _updatePaneLogBtns();
 });
 
+// モバイル: 上部トグルボタン（ペインより上の領域を隠す/表示）
+(function() {
+  console.log('[toggle] IIFE start');
+  const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  console.log('[toggle] isTouch=' + isTouch + ' maxTouchPoints=' + navigator.maxTouchPoints);
+  if (!isTouch) { console.log('[toggle] not touch, abort'); return; }
+
+  const toggleBtn = document.createElement('button');
+  toggleBtn.className = 'btn';
+  toggleBtn.style.cssText = 'display:none;position:fixed;bottom:10px;left:10px;z-index:9999;font-size:12px;padding:4px 12px;';
+  toggleBtn.textContent = '▲ 隠す';
+  document.body.appendChild(toggleBtn);
+  console.log('[toggle] btn created and appended');
+
+  const panesContainer = document.getElementById('live-panes-container');
+  console.log('[toggle] panesContainer found=' + !!panesContainer + ' display=' + (panesContainer ? panesContainer.style.display : 'N/A'));
+
+  function syncBtn() {
+    const visible = panesContainer && panesContainer.style.display !== 'none';
+    toggleBtn.style.display = visible ? '' : 'none';
+    const r = toggleBtn.getBoundingClientRect();
+    console.log('[toggle] syncBtn visible=' + visible + ' btn.display=' + toggleBtn.style.display + ' rect=' + JSON.stringify({l:Math.round(r.left),t:Math.round(r.top),w:Math.round(r.width),h:Math.round(r.height)}));
+  }
+  syncBtn();
+  if (panesContainer) {
+    new MutationObserver(syncBtn).observe(panesContainer, { attributes: true, attributeFilter: ['style'] });
+  }
+  toggleBtn.addEventListener('click', () => {
+    const hidden = document.body.classList.toggle('pane-top-hidden');
+    toggleBtn.textContent = hidden ? '▼ 表示' : '▲ 隠す';
+  });
+})();
+
 // ファイルロード時の処理：追加モードではライブ接続を維持、置換モードのみ切断する
 const _wsOrigLoadText = loadText;
 loadText = function(text) {
@@ -7059,6 +7117,7 @@ document.getElementById('reload-file-btn').addEventListener('click', () => {
 
 // ---- SkookumNet接続通知コピーボタン ----
 
+console.log('[SCRIPT END]');
 </script>
 </body>
 </html>
