@@ -1,4 +1,5 @@
 # Python / SkookumNet (not published)
+.pylintrc
 plugins/
 skookumnet_client.py
 SkookumNet.py
