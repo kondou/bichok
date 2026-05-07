@@ -14,9 +14,18 @@ skookumnet-client
 # Log files
 *.log
 
+# macOS / editor
+.DS_Store
+.claude-code
+
+# Repo meta (not published)
+LICENSE
+README.md
+
 # Internal / work files
 internals/
 makefile
 contest_log_analyzer_working.html
+.contest_log_analyzer_full_backup.html
 *.txt
 TODO
