@@ -2539,7 +2539,7 @@ const wsNowLinePlugin = {
       const ref = _refLog();
       const liveLog = _logStore.find(l => l.isLive && !l.isGroup);
       if (!ref || !liveLog) return;
-      nowX = ref.contestStartMs + (nowMs - liveLog.contestStartMs) + liveLog.offsetMs - ref.offsetMs;
+      nowX = _logAnchorMs(ref) + (nowMs - _logAnchorMs(liveLog)) + liveLog.offsetMs - ref.offsetMs;
     } else {
       nowX = nowMs;
     }
@@ -3194,7 +3194,7 @@ function renderCharts(qsos) {
   // マルチログ: 参照ログ + 追加ログ（非グループ）それぞれの帯を構築
   {
     const _mosRef = _refLog();
-    const _mosRefAnchor = _mosRef ? _mosRef.contestStartMs : (qsos[0] ? qsos[0].time.getTime() : 0); // 全体グラフ: 常にcontest start基準
+    const _mosRefAnchor = _mosRef ? _logAnchorMs(_mosRef) : (qsos[0] ? qsos[0].time.getTime() : 0);
     _multiOpSegments = [];
     if (!_mosRef || _isFullChartLogVisible(_mosRef)) {
       _multiOpSegments.push({ logId: _mosRef ? _mosRef.id : null, color: null, label: _mosRef ? _logDistinctLabel(_mosRef) : null, segments: opSegments });
@@ -3209,7 +3209,7 @@ function renderCharts(qsos) {
         const _mosSegs  = _mosLog.contestStartMs
           ? buildOpSegments(_mosQsos, _mosRunSP, false, { startMs: _mosLog.contestStartMs, endMs: _mosLog.contestStartMs + _mosDurMs })
           : buildOpSegments(_mosQsos, _mosRunSP, true);
-        const _mosAnchor = _mosLog.contestStartMs; // 全体グラフ: 常にcontest start基準
+        const _mosAnchor = _logAnchorMs(_mosLog);
         const _mosShift  = _mosRefAnchor - _mosAnchor + _mosLog.offsetMs;
         _multiOpSegments.push({
           logId: _mosLog.id,
@@ -3296,7 +3296,7 @@ function renderCharts(qsos) {
         // Scenario A: 過去ログが参照、SkookumNetはオーバーレイ
         // SkookumNetの絶対時刻(別年)でX軸を拡張しないよう、参照ログ時間軸基準で計算する
         const _xRefA = _refLog();
-        const _refAnchorA = _xRefA ? _xRefA.contestStartMs : startMs;
+        const _refAnchorA = _xRefA ? (_logAnchorMs(_xRefA) || startMs) : startMs;
         const _mappedEnd = _refAnchorA + _durMs;
         if (_mappedEnd > endMs) endMs = _mappedEnd;
       } else {
@@ -3308,12 +3308,12 @@ function renderCharts(qsos) {
     // 追加ログのシフト後終端時刻を計算してX軸を拡張（過去ログが長い場合）
     if (_multiLogMode) {
       const _xRef = _refLog();
-      const _xRefAnchor = _xRef ? _xRef.contestStartMs || startMs : startMs;
+      const _xRefAnchor = _xRef ? (_logAnchorMs(_xRef) || startMs) : startMs;
       for (const _xLog of _logStore) {
         if (!_isFullChartLogVisible(_xLog) || (_xRef && _xLog.id === _xRef.id)) continue;
         const _xQsos = _getLogQsos(_xLog);
         if (!_xQsos.length) continue;
-        const _xShift = _xRefAnchor - (_xLog.contestStartMs || 0) + _xLog.offsetMs;
+        const _xShift = _xRefAnchor - (_logAnchorMs(_xLog) || 0) + _xLog.offsetMs;
         const _xLastMs = _xQsos[_xQsos.length - 1].time.getTime() + _xShift;
         const _xSlotEnd = Math.ceil((_xLastMs + slotWidthMs) / slotWidthMs) * slotWidthMs;
         if (_xSlotEnd > endMs) endMs = _xSlotEnd;
@@ -3323,8 +3323,8 @@ function renderCharts(qsos) {
     if (_wsLiveQsos !== null && _liveEntry && _liveEntry.contestStartMs) {
       // Scenario A: 参照ログ時間軸上のnow位置で拡張（絶対時刻Date.now()は別年になるため使わない）
       const _xRefB = _refLog();
-      const _refAnchorB = _xRefB ? _xRefB.contestStartMs : startMs;
-      const _mappedNow = _refAnchorB + (Date.now() - _liveEntry.contestStartMs);
+      const _refAnchorB = _xRefB ? (_logAnchorMs(_xRefB) || startMs) : startMs;
+      const _mappedNow = _refAnchorB + (Date.now() - _logAnchorMs(_liveEntry));
       const _nowNeeded = Math.ceil((_mappedNow + slotWidthMs * 2) / slotWidthMs) * slotWidthMs;
       if (_nowNeeded > endMs) endMs = _nowNeeded;
     } else if (_wsLiveQsos === null) {
@@ -3595,8 +3595,7 @@ function renderCharts(qsos) {
   // ===== マルチログ: 追加ログのデータセットをcumulChartに追加 =====
   if (_multiLogMode) {
     const _mlRef = _refLog();
-    // 全体グラフは常にcontest start基準で揃える（アンカー設定に依存しない）
-    const _mlRefAnchor = _mlRef ? _mlRef.contestStartMs : startMs;
+    const _mlRefAnchor = _mlRef ? (_logAnchorMs(_mlRef) || startMs) : startMs;
     for (const _mlLog of _logStore) {
       if (!_isFullChartLogVisible(_mlLog) || (_mlRef && _mlLog.id === _mlRef.id)) continue;
       const _mlQsos = _getLogQsos(_mlLog);
@@ -3614,7 +3613,7 @@ function renderCharts(qsos) {
           idxs.forEach((qi, k) => { _mlQsos[qi]._liveTime = minMs + Math.round(60000 * k / n); });
         });
       }
-      const _mlAnchor = _mlLog.contestStartMs;  // 全体グラフ: 常にcontest start基準
+      const _mlAnchor = _logAnchorMs(_mlLog);
       const _mlShift  = _mlRefAnchor - _mlAnchor + _mlLog.offsetMs;
       const _mlPr = _mlQsos.length > 5000 ? 1 : _mlQsos.length > 1000 ? 1.5 : 2.5;
       const _mlRateColor = _logRateColor(_mlLog);
@@ -3920,7 +3919,7 @@ function renderCharts(qsos) {
   // ===== _rateSlotsPerLog を構築 (rateBarsPlugin が参照) =====
   {
     const _rs_ref = _refLog();
-    const _rs_refAnchor = _rs_ref ? _rs_ref.contestStartMs : startMs; // 全体グラフ: 常にcontest start基準
+    const _rs_refAnchor = _rs_ref ? (_logAnchorMs(_rs_ref) || startMs) : startMs;
     // 参照ログ: rateSlots をそのまま使用
     _rateSlotsPerLog = [{
       logId: _rs_ref ? _rs_ref.id : null,
@@ -3933,7 +3932,7 @@ function renderCharts(qsos) {
         if (!_isFullChartLogVisible(_rsLog) || (_rs_ref && _rsLog.id === _rs_ref.id) || _rsLog.isGroup) continue;
         const _rsQsos = _getLogQsos(_rsLog);
         if (!_rsQsos.length) continue;
-        const _rsAnchor = _rsLog.contestStartMs; // 全体グラフ: 常にcontest start基準
+        const _rsAnchor = _logAnchorMs(_rsLog);
         const _rsShift  = _rs_refAnchor - _rsAnchor + _rsLog.offsetMs;
         const { bandData: _rsBd, allBands: _rsAb, slotMs: _rsSms } = buildTimeline(_rsQsos, rateMins);
         const _rsSorted = [..._rsAb].sort((a, b) => bandToMeters(b) - bandToMeters(a));
