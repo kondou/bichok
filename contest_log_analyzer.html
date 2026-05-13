@@ -3296,7 +3296,8 @@ function renderCharts(qsos) {
       const _mappedNow = _refAnchorB + (Date.now() - _liveEntry.contestStartMs);
       const _nowNeeded = Math.ceil((_mappedNow + slotWidthMs * 2) / slotWidthMs) * slotWidthMs;
       if (_nowNeeded > endMs) endMs = _nowNeeded;
-    } else {
+    } else if (_wsLiveQsos === null) {
+      // 通常モード: Date.now()まで確保（Scenario A中はライブエントリ未着でも絶対時刻で拡張しない）
       const _nowNeeded = Math.ceil((Date.now() + slotWidthMs * 2) / slotWidthMs) * slotWidthMs;
       if (_nowNeeded > endMs) endMs = _nowNeeded;
     }
