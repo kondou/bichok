@@ -1429,7 +1429,7 @@ function _customConfirm(msg, okLabel, cancelLabel, replaceLabel) {
     okBtn.focus();
     const cleanup = result => {
       overlay.style.display = 'none';
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKey, true);
       resolve(result);
     };
     okBtn.onclick      = () => cleanup('ok');
@@ -1445,7 +1445,7 @@ function _customConfirm(msg, okLabel, cancelLabel, replaceLabel) {
         btns[(idx + (e.shiftKey ? btns.length - 1 : 1)) % btns.length].focus();
       }
     }
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey, true);
   });
 }
 
@@ -5367,6 +5367,9 @@ function wsHandleMessage(msg) {
       activeViews.add('full');
       activeViews.add('live3h');
       _startLiveAnimation();
+      // 接続直後にログパネルへ空のライブエントリを追加（QSO未着でもパネルに表示）
+      _addLogEntry([], 'SkookumNet', { isLive: true, _isAdif: true });
+      _renderLogPanel();
       applyView();
       // ファイルログが既にある場合: 接続直後にオーバーレイ表示を復元
       if (_logStore.some(l => !l.isLive && !l.isGroup)) wsScheduleRender();
