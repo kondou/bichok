@@ -601,9 +601,9 @@ body.compact #compact-btn { opacity: 1; color: var(--accent); border-color: var(
   <div style="background:#2a2a2d;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:24px 28px;min-width:320px;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,0.7);color:var(--text);font-family:inherit;font-size:13px;">
     <div id="custom-confirm-msg" style="white-space:pre-line;line-height:1.6;margin-bottom:20px;"></div>
     <div style="display:flex;justify-content:flex-end;gap:8px;">
-      <button id="custom-confirm-cancel" class="btn" style="padding:5px 16px;"></button>
-      <button id="custom-confirm-replace" class="btn" style="padding:5px 16px;display:none;"></button>
       <button id="custom-confirm-ok" class="btn" style="padding:5px 16px;background:var(--blue-dim);border-color:var(--blue);color:#fff;"></button>
+      <button id="custom-confirm-replace" class="btn" style="padding:5px 16px;display:none;"></button>
+      <button id="custom-confirm-cancel" class="btn" style="padding:5px 16px;"></button>
     </div>
   </div>
 </div>
@@ -1412,11 +1412,13 @@ function applyLang() {
 // カスタム確認ダイアログ（ネイティブconfirm()の代替）
 function _customConfirm(msg, okLabel, cancelLabel, replaceLabel) {
   return new Promise(resolve => {
-    const overlay = document.getElementById('custom-confirm-overlay');
+    const overlay   = document.getElementById('custom-confirm-overlay');
+    const okBtn     = document.getElementById('custom-confirm-ok');
     const replaceBtn = document.getElementById('custom-confirm-replace');
+    const cancelBtn = document.getElementById('custom-confirm-cancel');
     document.getElementById('custom-confirm-msg').textContent = msg;
-    document.getElementById('custom-confirm-ok').textContent = okLabel || 'OK';
-    document.getElementById('custom-confirm-cancel').textContent = cancelLabel || i18n('cancelBtn');
+    okBtn.textContent = okLabel || 'OK';
+    cancelBtn.textContent = cancelLabel || i18n('cancelBtn');
     if (replaceLabel) {
       replaceBtn.textContent = replaceLabel;
       replaceBtn.style.display = '';
@@ -1424,10 +1426,26 @@ function _customConfirm(msg, okLabel, cancelLabel, replaceLabel) {
       replaceBtn.style.display = 'none';
     }
     overlay.style.display = 'flex';
-    const cleanup = result => { overlay.style.display = 'none'; resolve(result); };
-    document.getElementById('custom-confirm-ok').onclick = () => cleanup('ok');
-    document.getElementById('custom-confirm-replace').onclick = () => cleanup('replace');
-    document.getElementById('custom-confirm-cancel').onclick = () => cleanup('cancel');
+    okBtn.focus();
+    const cleanup = result => {
+      overlay.style.display = 'none';
+      document.removeEventListener('keydown', onKey);
+      resolve(result);
+    };
+    okBtn.onclick      = () => cleanup('ok');
+    replaceBtn.onclick = () => cleanup('replace');
+    cancelBtn.onclick  = () => cleanup('cancel');
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); cleanup('cancel'); return; }
+      if (e.key === 'Enter')  { e.preventDefault(); document.activeElement.click(); return; }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const btns = [okBtn, replaceBtn, cancelBtn].filter(b => b.style.display !== 'none');
+        const idx = btns.indexOf(document.activeElement);
+        btns[(idx + (e.shiftKey ? btns.length - 1 : 1)) % btns.length].focus();
+      }
+    }
+    document.addEventListener('keydown', onKey);
   });
 }
 
