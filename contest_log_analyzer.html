@@ -4096,9 +4096,10 @@ async function loadText(text, appendMode) {
     const _preAwaitStart = (_hasLiveEntry && globalStartMs > 0) ? globalStartMs : null;
     const _preAwaitEnd   = (_hasLiveEntry && globalEndMs   > 0) ? globalEndMs   : null;
 
-    // 追加モード判定: appendMode=true、またはログが既にある時に自動確認
+    // 追加モード判定: appendMode=true、またはログが既にある時(SkookumNet接続中を含む)に自動確認
     let isAppend = !!appendMode;
-    if (!isAppend && _logStore.length > 0 && !appendMode) {
+    const _hasLiveSocket = wsSocket && wsSocket.readyState <= 1;
+    if (!isAppend && (_logStore.length > 0 || _hasLiveSocket) && !appendMode) {
       const choice = await _customConfirm(i18n('logLoadedConfirm'), 'OK');
       isAppend = choice; // OK→追加, Cancel→置換
     }
@@ -7131,9 +7132,11 @@ document.getElementById('pane-add-btn').addEventListener('click', () => {
 // ファイルロード時の処理：追加モードではライブ接続を維持、置換モードのみ切断する
 const _wsOrigLoadText = loadText;
 loadText = function(text) {
-  // ライブエントリがある場合は追加モードの可能性があるため切断しない
+  // ライブエントリが存在するか、ソケットが接続中の場合は切断しない
   // 置換モードが選択された場合は loadText 内の置換ブランチで切断する
-  if (!_logStore.find(l => l.isLive && !l.isGroup)) {
+  const _hasLiveEntry  = !!_logStore.find(l => l.isLive && !l.isGroup);
+  const _hasActiveSocket = wsSocket && wsSocket.readyState <= 1;
+  if (!_hasLiveEntry && !_hasActiveSocket) {
     if (wsSocket) wsDisconnect();
     wsLiveMode = false;
     wsQsos = [];
