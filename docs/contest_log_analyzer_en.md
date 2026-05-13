@@ -164,6 +164,8 @@ Drag a log file onto the browser window.
 ### Open File button
 Click the **Open File** button (top right) and select a file.
 
+> **Safari note:** The file picker button is labelled "Upload," but the file is processed entirely within the browser and is never sent to any server.
+
 ### Supported formats
 
 | Format | Extensions |
@@ -172,12 +174,13 @@ Click the **Open File** button (top right) and select a file.
 | ADIF | `.adi` `.adif` |
 
 ### Loading a second (or additional) log
-When a log is already loaded and you open another file, a confirmation dialog appears.
+When data is already displayed (file log or active SkookumNet connection), opening another file shows a confirmation dialog. Press Esc to cancel, or Enter to confirm the focused button.
 
-| Choice | Action |
+| Button | Action |
 |--------|--------|
-| **OK** | Add as a comparison log (→ [Loading Multiple Logs](#15-loading-multiple-logs)) |
-| **Cancel** | Replace the current log with the new file |
+| **Add** | Keep current data and add the new file as a comparison log (→ [Loading Multiple Logs](#15-loading-multiple-logs)) |
+| **Discard and load** | Discard all current data and load the new file |
+| **Cancel** | Abort the load and keep the current state |
 
 ### What is displayed after loading
 
@@ -673,7 +676,7 @@ When the Pane View is active, a **▲ Hide** button appears at the bottom-left o
 
 ## License
 
-BICHOK version 1.0.0  
+BICHOK version 1.0.1  
 Copyright © 2026 kondou  
 Released under the MIT License.
 

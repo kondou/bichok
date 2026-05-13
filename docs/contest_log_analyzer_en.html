@@ -589,6 +589,11 @@ instructions</a>).</p>
 <h3 id="open-file-button">Open File button</h3>
 <p>Click the <strong>Open File</strong> button (top right) and select a
 file.</p>
+<blockquote>
+<p><strong>Safari note:</strong> The file picker button is labelled
+&quot;Upload,&quot; but the file is processed entirely within the browser and is
+never sent to any server.</p>
+</blockquote>
 <h3 id="supported-formats">Supported formats</h3>
 <table>
 <thead>
@@ -611,8 +616,9 @@ file.</p>
 </table>
 <h3 id="loading-a-second-or-additional-log">Loading a second (or
 additional) log</h3>
-<p>When a log is already loaded and you open another file, a
-confirmation dialog appears.</p>
+<p>When data is already displayed (file log or active SkookumNet
+connection), opening another file shows a confirmation dialog. Press Esc
+to cancel, or Enter to confirm the focused button.</p>
 <table>
 <colgroup>
 <col style="width: 50%" />
@@ -620,18 +626,22 @@ confirmation dialog appears.</p>
 </colgroup>
 <thead>
 <tr>
-<th>Choice</th>
+<th>Button</th>
 <th>Action</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>OK</strong></td>
-<td>Add as a comparison log (→ <a href="#15-loading-multiple-logs">Loading Multiple Logs</a>)</td>
+<td><strong>Add</strong></td>
+<td>Keep current data and add the new file as a comparison log (→ <a href="#15-loading-multiple-logs">Loading Multiple Logs</a>)</td>
+</tr>
+<tr>
+<td><strong>Discard and load</strong></td>
+<td>Discard all current data and load the new file</td>
 </tr>
 <tr>
 <td><strong>Cancel</strong></td>
-<td>Replace the current log with the new file</td>
+<td>Abort the load and keep the current state</td>
 </tr>
 </tbody>
 </table>
@@ -1640,7 +1650,7 @@ both portrait and landscape orientations.</p>
 </blockquote>
 <hr />
 <h2 id="license">License</h2>
-<p>BICHOK version 1.0.0<br />
+<p>BICHOK version 1.0.1<br />
 Copyright © 2026 kondou<br />
 Released under the MIT License.</p>
 <pre><code>Permission is hereby granted, free of charge, to any person obtaining a copy

@@ -676,7 +676,7 @@ iPhone（Safari）等で利用可能。縦・横いずれの向きでも動作�
 
 ## ライセンス
 
-BICHOK version 1.0.0  
+BICHOK version 1.0.1  
 Copyright © 2026 kondou  
 MIT License にて公開。
 

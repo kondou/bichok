@@ -574,6 +574,10 @@ plugins/                    ← skookumnet_client.py が使用するプラグイ
 <h3 id="ファイルを開くボタン">ファイルを開くボタン</h3>
 <p>右上の <strong>「ファイルを開く」</strong>
 ボタンをクリックしてファイルを選択。</p>
+<blockquote>
+<p><strong>Safari の場合:</strong>
+ファイル選択ダイアログのボタンが「アップロード」と表示されるが、ファイルはブラウザ内でのみ処理され外部サーバへの送信は行わない。</p>
+</blockquote>
 <h3 id="対応形式">対応形式</h3>
 <table>
 <thead>
@@ -595,26 +599,32 @@ plugins/                    ← skookumnet_client.py が使用するプラグイ
 </tbody>
 </table>
 <h3 id="つ目以降のログを読み込む">2つ目以降のログを読み込む</h3>
-<p>すでにログが表示されている状態で新しいファイルを開くと、確認ダイアログが表示される。</p>
+<p>すでにデータが表示されている状態（ファイルログ・SkookumNet接続中を含む）で新しいファイルを開くと、確認ダイアログが表示される。ESC
+キーでキャンセル、Tab キーでボタン間を移動、Enter
+キーでフォーカス中のボタンを実行できる。</p>
 <table>
 <colgroup>
-<col style="width: 50%" />
-<col style="width: 50%" />
+<col style="width: 57%" />
+<col style="width: 42%" />
 </colgroup>
 <thead>
 <tr>
-<th>選択</th>
+<th>ボタン</th>
 <th>動作</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>OK</strong></td>
-<td>比較用ログとして追加（→ <a href="#15-複数ログの読み込み">複数ログの読み込み</a>）</td>
+<td><strong>追加</strong></td>
+<td>現在のデータを維持したまま比較用として追加（→ <a href="#15-複数ログの読み込み">複数ログの読み込み</a>）</td>
 </tr>
 <tr>
-<td><strong>Cancel</strong></td>
-<td>現在のログを置き換えて新規に読み込む</td>
+<td><strong>現在のデータを破棄して読み込む</strong></td>
+<td>現在のデータをすべて破棄し、新しいファイルを読み込む</td>
+</tr>
+<tr>
+<td><strong>キャンセル</strong></td>
+<td>読み込みを中止して元の状態を維持</td>
 </tr>
 </tbody>
 </table>
@@ -1555,7 +1565,7 @@ QSO」アンカーが合わせやすい場合がある</li>
 </blockquote>
 <hr />
 <h2 id="ライセンス">ライセンス</h2>
-<p>BICHOK version 1.0.0<br />
+<p>BICHOK version 1.0.1<br />
 Copyright © 2026 kondou<br />
 MIT License にて公開。</p>
 <pre><code>Permission is hereby granted, free of charge, to any person obtaining a copy
