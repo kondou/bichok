@@ -4171,8 +4171,16 @@ async function loadText(text, appendMode) {
         }
       }
       const label = _makeLogLabel('Log ' + (_logStore.length + 1));
-      _addLogEntry(newQsos, label, { _isAdif: isAdif, _meta: _loadMeta });
+      const _addedLogId = _addLogEntry(newQsos, label, { _isAdif: isAdif, _meta: _loadMeta });
       _renderLogPanel();
+      // SkookumNetがREFかつQSOなし: 新規静的ログをREFに昇格（SkookumNetを参照軸にすると空チャートになるため）
+      if (wsLiveMode && wsQsos.length === 0) {
+        const _liveRef = _logStore.find(l => l.isLive && l.isReference);
+        if (_liveRef) {
+          const _addedEntry = _logStore.find(l => l.id === _addedLogId);
+          if (_addedEntry) { _liveRef.isReference = false; _addedEntry.isReference = true; _renderLogPanel(); }
+        }
+      }
       // ログパネルを自動表示
       const _lpEl = document.getElementById('log-panel');
       if (_lpEl) _lpEl.style.display = 'flex';
