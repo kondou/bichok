@@ -5331,6 +5331,8 @@ function wsHandleMessage(msg) {
       activeViews.add('live3h');
       _startLiveAnimation();
       applyView();
+      // ファイルログが既にある場合: 接続直後にオーバーレイ表示を復元
+      if (_logStore.some(l => !l.isLive && !l.isGroup)) wsScheduleRender();
       // SkookumNet接続通知を5秒間表示
       break;
     case 'addQSO': {
