@@ -602,6 +602,7 @@ body.compact #compact-btn { opacity: 1; color: var(--accent); border-color: var(
     <div id="custom-confirm-msg" style="white-space:pre-line;line-height:1.6;margin-bottom:20px;"></div>
     <div style="display:flex;justify-content:flex-end;gap:8px;">
       <button id="custom-confirm-cancel" class="btn" style="padding:5px 16px;"></button>
+      <button id="custom-confirm-replace" class="btn" style="padding:5px 16px;display:none;"></button>
       <button id="custom-confirm-ok" class="btn" style="padding:5px 16px;background:var(--blue-dim);border-color:var(--blue);color:#fff;"></button>
     </div>
   </div>
@@ -1204,12 +1205,14 @@ const I18N = {
     offtimeSkipTitle: 'Off Time区間をレート計算から除外するかどうか切り替え',
     offtimeSkipping: 'Off Time: スキップ',
     offtimeIncluding: 'Off Time: 含める',
-    logLoadedConfirm: '既にログが読み込まれています。\n\n【OK】= このログを比較用に追加\n【キャンセル】= 現在のログを置き換え',
+    logLoadedConfirm: '既にデータが表示されています。',
+    logReplaceBtn: '現在のデータを破棄して読み込む',
     selectAll: 'すべて',
     nSelected: n => `${n}個選択`,
     wsStaCombined: 'SkookumNet（合算）',
     yAxisQso: 'QSO数',
     dropOverlay: 'Cabrillo / ADIF をドロップ',
+    addBtn: '追加',
     cancelBtn: 'キャンセル',
     copyBtn: 'コピー',
     logPanelBtnTitle: 'ログ管理パネル',
@@ -1310,12 +1313,14 @@ const I18N = {
     offtimeSkipTitle: 'Toggle whether off-time intervals are excluded from rate calculation',
     offtimeSkipping: 'Off Time: Skip',
     offtimeIncluding: 'Off Time: Include',
-    logLoadedConfirm: 'A log is already loaded.\n\n[OK] = Add as comparison log\n[Cancel] = Replace current log',
+    logLoadedConfirm: 'Data is already displayed.',
+    logReplaceBtn: 'Discard and load',
     selectAll: 'All',
     nSelected: n => `${n} selected`,
     wsStaCombined: 'SkookumNet (Combined)',
     yAxisQso: 'QSOs',
     dropOverlay: 'Drop Cabrillo / ADIF',
+    addBtn: 'Add',
     cancelBtn: 'Cancel',
     copyBtn: 'Copy',
     logPanelBtnTitle: 'Log Management Panel',
@@ -1405,16 +1410,24 @@ function applyLang() {
 }
 
 // カスタム確認ダイアログ（ネイティブconfirm()の代替）
-function _customConfirm(msg, okLabel, cancelLabel) {
+function _customConfirm(msg, okLabel, cancelLabel, replaceLabel) {
   return new Promise(resolve => {
     const overlay = document.getElementById('custom-confirm-overlay');
+    const replaceBtn = document.getElementById('custom-confirm-replace');
     document.getElementById('custom-confirm-msg').textContent = msg;
     document.getElementById('custom-confirm-ok').textContent = okLabel || 'OK';
     document.getElementById('custom-confirm-cancel').textContent = cancelLabel || i18n('cancelBtn');
+    if (replaceLabel) {
+      replaceBtn.textContent = replaceLabel;
+      replaceBtn.style.display = '';
+    } else {
+      replaceBtn.style.display = 'none';
+    }
     overlay.style.display = 'flex';
     const cleanup = result => { overlay.style.display = 'none'; resolve(result); };
-    document.getElementById('custom-confirm-ok').onclick = () => cleanup(true);
-    document.getElementById('custom-confirm-cancel').onclick = () => cleanup(false);
+    document.getElementById('custom-confirm-ok').onclick = () => cleanup('ok');
+    document.getElementById('custom-confirm-replace').onclick = () => cleanup('replace');
+    document.getElementById('custom-confirm-cancel').onclick = () => cleanup('cancel');
   });
 }
 
@@ -4101,8 +4114,14 @@ async function loadText(text, appendMode) {
     let isAppend = !!appendMode;
     const _hasLiveSocket = wsSocket && wsSocket.readyState <= 1;
     if (!isAppend && (_logStore.length > 0 || _hasLiveSocket) && !appendMode) {
-      const choice = await _customConfirm(i18n('logLoadedConfirm'), 'OK');
-      isAppend = choice; // OK→追加, Cancel→置換
+      const choice = await _customConfirm(
+        i18n('logLoadedConfirm'),
+        i18n('addBtn'),
+        i18n('cancelBtn'),
+        i18n('logReplaceBtn')
+      );
+      if (choice === 'cancel') return;
+      isAppend = choice === 'ok'; // ok→追加, replace→置換
     }
 
     // ラベル生成: コールサイン + 年 + コンテスト名（全部つなげた詳細ラベル）
