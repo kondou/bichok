@@ -1671,7 +1671,7 @@ function _logAnchorMs(log) {
     const first = log.memberIds.map(id => _logStore.find(l => l.id === id)).find(Boolean);
     return first ? _logAnchorMs(first) : 0;
   }
-  if (log.anchorMode === 'firstQso') return log.qsos.length ? log.qsos[0].time.getTime() : 0;
+  if (log.anchorMode === 'firstQso') return log.qsos.length ? log.qsos[0].time.getTime() : (log.contestStartMs || 0);
   return log.contestStartMs || 0;
 }
 
@@ -2037,6 +2037,8 @@ function _renderLogPanel() {
                       `<option value="firstQso"${log.anchorMode==='firstQso'?' selected':''}>${i18n('logAnchorFirst')}</option>`;
       anc.onchange = () => {
         log.anchorMode = anc.value;
+        globalStartMs = null;
+        globalEndMs = null;
         if (cumulChart && rateChart) renderCharts(currentQsos);
       };
       div.appendChild(anc);
