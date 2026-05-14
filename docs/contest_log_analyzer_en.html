@@ -270,12 +270,12 @@ needed.</p>
 <tbody>
 <tr>
 <td><strong>Run / CQ</strong></td>
-<td>Calling CQ and working stations that call you. Shown as &quot;Run&quot; in the
+<td>Calling CQ and working stations that call you. Shown as “Run” in the
 chart legend.</td>
 </tr>
 <tr>
 <td><strong>S&amp;P (Search &amp; Pounce)</strong></td>
-<td>Hunting across the band for stations to call. Shown as &quot;S&amp;P&quot; in
+<td>Hunting across the band for stations to call. Shown as “S&amp;P” in
 the chart legend.</td>
 </tr>
 <tr>
@@ -296,7 +296,7 @@ synchronized, interleaved fashion.</td>
 </table>
 <blockquote>
 <p><strong>How Run/S&amp;P is detected</strong></p>
-<p>For Cabrillo and ADIF logs, the tool infers Run vs. S&amp;P on a
+<p>For Cabrillo and ADIF logs, the tool infers Run vs. S&amp;P on a
 per-band basis from the frequency change between consecutive QSOs on the
 same band.</p>
 <p><strong>Detection rules (applied per band):</strong></p>
@@ -351,7 +351,7 @@ algorithm yields more accurate results.</p>
 <tr>
 <td><strong>ADIF (Amateur Data Interchange Format)</strong></td>
 <td>A widely used log format, not limited to contests. QSO times are
-recorded to the second and frequencies to Hz (vs. minute/kHz granularity
+recorded to the second and frequencies to Hz (vs. minute/kHz granularity
 in Cabrillo), enabling more detailed analysis. Extensions:
 <code>.adi</code> <code>.adif</code></td>
 </tr>
@@ -387,7 +387,7 @@ timestamps for rate calculations.</td>
 <tr>
 <td><strong>No QSO</strong></td>
 <td>A gap of 10 minutes or more with no QSOs. Shown as gray in the mode
-bar and labeled &quot;No QSO&quot; in the legend. Typically indicates a temporary
+bar and labeled “No QSO” in the legend. Typically indicates a temporary
 pause such as a band change or equipment adjustment. In WPX and WAE
 contests, gaps under 60 minutes are No QSO; gaps of 60 minutes or more
 become Off Time. In all other contests, all gaps are treated as No QSO
@@ -468,9 +468,9 @@ logs.</td>
 </tr>
 <tr>
 <td><strong>Contest start anchor</strong></td>
-<td>The reference point used to align times across logs: &quot;Contest Start&quot;
-(the contest start time entered in the UTC field) or &quot;First QSO&quot; (each
-log&#39;s own first QSO time).</td>
+<td>The reference point used to align times across logs: “Contest Start”
+(the contest start time entered in the UTC field) or “First QSO” (each
+log’s own first QSO time).</td>
 </tr>
 <tr>
 <td><strong>Offset</strong></td>
@@ -591,7 +591,7 @@ instructions</a>).</p>
 file.</p>
 <blockquote>
 <p><strong>Safari note:</strong> The file picker button is labelled
-&quot;Upload,&quot; but the file is processed entirely within the browser and is
+“Upload,” but the file is processed entirely within the browser and is
 never sent to any server.</p>
 </blockquote>
 <h3 id="supported-formats">Supported formats</h3>
@@ -857,7 +857,7 @@ main chart.</li>
 </ul>
 <h3 id="tooltip">Tooltip</h3>
 <p>Hovering over the main chart pops up a tooltip showing the following
-values at the cursor&#39;s time position.</p>
+values at the cursor’s time position.</p>
 <table>
 <thead>
 <tr>
@@ -892,7 +892,7 @@ values at the cursor&#39;s time position.</p>
 </tr>
 </tbody>
 </table>
-<p>When comparing multiple logs, each log&#39;s values are shown on separate
+<p>When comparing multiple logs, each log’s values are shown on separate
 lines labeled with the log name.</p>
 <hr />
 <h2 id="8-band-breakdown-chart">8. Band Breakdown Chart</h2>
@@ -914,7 +914,7 @@ hour.</p>
 colors. Only bands that actually appear in the log are included. When
 comparing multiple logs, every band present in any log is included in
 the legend.</p>
-<p>In multi-log mode, each slot&#39;s bar is split between the reference log
+<p>In multi-log mode, each slot’s bar is split between the reference log
 (REF) and additional logs, displayed side by side (→ <a href="#15-loading-multiple-logs">Loading Multiple Logs</a>).
 <strong>Additional log bars are rendered darker and slightly more
 transparent</strong> than the reference log bars, making it easy to
@@ -1014,7 +1014,7 @@ accumulated Off Time.</p>
 </table>
 <blockquote>
 <p>In contests other than WPX and WAE, gaps of 60 minutes or more are
-also shown as &quot;No QSO&quot; — Off Time detection does not apply.</p>
+also shown as “No QSO” — Off Time detection does not apply.</p>
 </blockquote>
 <hr />
 <h2 id="10-trend-overlays-rate--ema--loess--accel">10. Trend Overlays
@@ -1121,7 +1121,7 @@ boundary detection also follows the UTC range</td>
 </table>
 <h3 id="anchor-and-offset-for-multi-log-comparison">Anchor and offset
 for multi-log comparison</h3>
-<p>In the log management panel (→ <a href="#15-loading-multiple-logs">Loading Multiple Logs</a>), each log&#39;s
+<p>In the log management panel (→ <a href="#15-loading-multiple-logs">Loading Multiple Logs</a>), each log’s
 time reference point (contest start anchor) and offset can be configured
 independently.</p>
 <table>
@@ -1142,10 +1142,13 @@ independently.</p>
 </tr>
 <tr>
 <td>First QSO</td>
-<td>Aligns the log to that log&#39;s own first QSO time</td>
+<td>Aligns the log to that log’s own first QSO time</td>
 </tr>
 </tbody>
 </table>
+<p>For detailed behavior when combined with a SkookumNet live connection
+(loading order, red line position) → <a href="#anchor-and-red-line-behavior">§17 Anchor and red-line
+behavior</a></p>
 <hr />
 <h2 id="13-off-time-skip">13. Off Time Skip</h2>
 <p>When Off Time is detected in a WPX or WAE contest log, an <strong>Off
@@ -1181,7 +1184,7 @@ computed over actual operating time only</td>
 </table>
 <p>Click the button to toggle.</p>
 <blockquote>
-<p>The &quot;Off Time (HH:MM)&quot; shown in the legend always reflects the total
+<p>The “Off Time (HH:MM)” shown in the legend always reflects the total
 accumulated Off Time, regardless of whether Skip is on or off.</p>
 </blockquote>
 <hr />
@@ -1239,7 +1242,7 @@ progresses.</p>
 <ol type="1">
 <li>Click <strong>Logs</strong> to open the log management panel.</li>
 <li>Click <strong>+ Add log</strong> and select a file.</li>
-<li>Or drag and drop a file onto the window and choose &quot;OK (Add)&quot;.</li>
+<li>Or drag and drop a file onto the window and choose “OK (Add)”.</li>
 </ol>
 <h3 id="log-management-panel">Log management panel</h3>
 <figure>
@@ -1260,7 +1263,7 @@ progresses.</p>
 <tbody>
 <tr>
 <td>Color swatch (■) click</td>
-<td>Toggle that log&#39;s visibility</td>
+<td>Toggle that log’s visibility</td>
 </tr>
 <tr>
 <td>Double-click label</td>
@@ -1327,8 +1330,8 @@ session.</p>
 </tr>
 <tr>
 <td><strong>Base rate</strong> input</td>
-<td>Set the pane&#39;s own rate aggregation window (changing the main chart
-base rate also overwrites the pane&#39;s value; to keep a pane-specific
+<td>Set the pane’s own rate aggregation window (changing the main chart
+base rate also overwrites the pane’s value; to keep a pane-specific
 value, re-enter it after changing the main chart base rate)</td>
 </tr>
 <tr>
@@ -1402,7 +1405,7 @@ station (→ <a href="#multi-station-multi-op">Multi-station
 <hr />
 <h2 id="17-skookumnet-live-connection">17. SkookumNet Live
 Connection</h2>
-<p>Receive and display SkookumLogger&#39;s SkookumNet packets in real
+<p>Receive and display SkookumLogger’s SkookumNet packets in real
 time.</p>
 <h3 id="prerequisites">Prerequisites</h3>
 <ul>
@@ -1451,6 +1454,142 @@ reference log (X-axis anchor).</p>
 <figcaption aria-hidden="true">Historical log + SkookumNet live
 overlay</figcaption>
 </figure>
+<h3 id="anchor-and-red-line-behavior">Anchor and red-line behavior</h3>
+<p>When combining a SkookumNet live connection with a historical log
+file, <strong>the loading order determines which log becomes the
+reference log</strong> (X-axis basis), and therefore where the X-axis
+origin and red dashed line appear.</p>
+<ul>
+<li><strong>File loaded first</strong>: Load the file before connecting
+to SkookumNet. The file becomes the reference log (REF) and SkNet data
+is overlaid on the file’s time axis.</li>
+<li><strong>SkNet connected first</strong>: Connect to SkookumNet and
+receive at least one QSO before adding the file. SkNet becomes the
+reference log (REF) and the file is overlaid on SkNet’s time axis.</li>
+</ul>
+<blockquote>
+<p><strong>Exception:</strong> If SkNet is connected but has 0 QSOs when
+the file is added, the file is promoted to reference log (same behavior
+as “file loaded first”).</p>
+</blockquote>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr>
+<th>File anchor</th>
+<th>SkNet anchor</th>
+<th>File-first: X-axis origin</th>
+<th>File-first: red line position</th>
+<th>SkNet-first: X-axis origin</th>
+<th>SkNet-first: red line position</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Contest Start</td>
+<td>Contest Start</td>
+<td>File’s Contest Start</td>
+<td>FileCS + (now − SkNet CS)</td>
+<td>SkNet’s Contest Start</td>
+<td>Current real time</td>
+</tr>
+<tr>
+<td>Contest Start</td>
+<td>First QSO</td>
+<td>File’s Contest Start</td>
+<td>FileCS + (now − SkNet FirstQSO)</td>
+<td>SkNet’s First QSO</td>
+<td>Current real time</td>
+</tr>
+<tr>
+<td>First QSO</td>
+<td>First QSO</td>
+<td>File’s First QSO</td>
+<td>FileFirstQSO + (now − SkNet FirstQSO)</td>
+<td>SkNet’s First QSO</td>
+<td>Current real time</td>
+</tr>
+<tr>
+<td>First QSO</td>
+<td>Contest Start</td>
+<td>File’s First QSO</td>
+<td>FileFirstQSO + (now − SkNet CS)</td>
+<td>SkNet’s Contest Start</td>
+<td>Current real time</td>
+</tr>
+</tbody>
+</table>
+<p><strong>How to read the red line:</strong></p>
+<ul>
+<li><p><strong>File loaded first</strong>: The red line shows where
+SkNet’s current elapsed time (measured from its anchor) lands on the
+file’s time axis. When both anchors point to the same time (e.g., both
+Contest Start at 00:00) the red line matches the current real time
+exactly. When anchors differ, the red line shifts by that
+difference.</p></li>
+<li><p><strong>SkNet connected first</strong>: SkNet is the reference,
+so the X-axis represents SkNet’s real time directly. The red line always
+appears at the current real time.</p></li>
+</ul>
+<h4 id="examples">Examples</h4>
+<p>Assume: contest starts 00:00, file’s first QSO at 00:03, SkNet’s
+first QSO at 00:05, current time 02:30.</p>
+<p><strong>File-first · both Contest Start anchors:</strong></p>
+<dl>
+<dt>X-axis origin</dt>
+<dd>
+00:00 (contest start)
+</dd>
+<dt>Red line</dt>
+<dd>
+00:00 + (02:30 − 00:00) = <strong>02:30</strong> (equals current real
+time)
+</dd>
+</dl>
+<p><strong>File-first · file = Contest Start / SkNet = First QSO
+anchor:</strong></p>
+<dl>
+<dt>X-axis origin</dt>
+<dd>
+00:00 (contest start)
+</dd>
+<dt>Red line</dt>
+<dd>
+00:00 + (02:30 − 00:05) = <strong>02:25</strong> (5 minutes before
+current real time on the chart)
+</dd>
+</dl>
+<p><strong>File-first · both First QSO anchors:</strong></p>
+<dl>
+<dt>X-axis origin</dt>
+<dd>
+00:03 (file’s first QSO)
+</dd>
+<dt>Red line</dt>
+<dd>
+00:03 + (02:30 − 00:05) = <strong>02:28</strong> (2 minutes before
+current real time on the chart)
+</dd>
+</dl>
+<p><strong>SkNet connected first (same behavior regardless of
+anchor):</strong></p>
+<dl>
+<dt>X-axis origin</dt>
+<dd>
+SkNet’s anchor time (see column 5 of the table above)
+</dd>
+<dt>Red line</dt>
+<dd>
+always at current real time (in this example, <strong>02:30</strong>)
+</dd>
+</dl>
 <h3 id="multi-station-multi-op">Multi-station (multi-op)</h3>
 <p>When multiple PCs are in the same SkookumNet session, use the
 <strong>All</strong> button in any pane to select which station to
@@ -1489,7 +1628,7 @@ restore them on next launch.</p>
 <tbody>
 <tr>
 <td><strong>Save</strong></td>
-<td>Save the current state to the browser&#39;s localStorage</td>
+<td>Save the current state to the browser’s localStorage</td>
 </tr>
 <tr>
 <td><strong>Restore</strong></td>
@@ -1524,7 +1663,7 @@ automatically.</li>
 <p>Use the <strong>EN</strong> / <strong>JA</strong> button (top right)
 to switch between English and Japanese.</p>
 <ul>
-<li>If your browser&#39;s language is set to Japanese, the interface
+<li>If your browser’s language is set to Japanese, the interface
 defaults to Japanese.</li>
 <li>Otherwise, it defaults to English.</li>
 </ul>
@@ -1596,10 +1735,10 @@ misaligned in multi-log mode</h3>
 <ul>
 <li>Check the anchor (time reference point) setting in the log
 management panel.</li>
-<li>If both logs are from the same contest, &quot;Contest Start&quot; is the
+<li>If both logs are from the same contest, “Contest Start” is the
 standard anchor.</li>
-<li>When comparing logs from different contest years or dates, &quot;First
-QSO&quot; is often easier to align with.</li>
+<li>When comparing logs from different contest years or dates, “First
+QSO” is often easier to align with.</li>
 </ul>
 <hr />
 <h2 id="23-using-on-a-smartphone">23. Using on a Smartphone</h2>
@@ -1650,7 +1789,7 @@ both portrait and landscape orientations.</p>
 </blockquote>
 <hr />
 <h2 id="license">License</h2>
-<p>BICHOK version 1.0.1<br />
+<p>BICHOK version 1.0.2<br />
 Copyright © 2026 kondou<br />
 Released under the MIT License.</p>
 <pre><code>Permission is hereby granted, free of charge, to any person obtaining a copy

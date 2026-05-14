@@ -397,6 +397,8 @@ In the log management panel (→ [Loading Multiple Logs](#15-loading-multiple-lo
 | Contest Start | Aligns the log to the UTC start time entered in the UTC field |
 | First QSO | Aligns the log to that log's own first QSO time |
 
+For detailed behavior when combined with a SkookumNet live connection (loading order, red line position) → [§17 Anchor and red-line behavior](#anchor-and-red-line-behavior)
+
 ---
 
 ## 13. Off Time Skip {#13-off-time-skip}
@@ -553,6 +555,64 @@ You can load a historical Cabrillo or ADIF log while a SkookumNet live connectio
 
 ![Historical log + SkookumNet live overlay](images/en/K-3.png)
 
+### Anchor and red-line behavior
+
+When combining a SkookumNet live connection with a historical log file, **the loading order determines which log becomes the reference log** (X-axis basis), and therefore where the X-axis origin and red dashed line appear.
+
+- **File loaded first**: Load the file before connecting to SkookumNet. The file becomes the reference log (REF) and SkNet data is overlaid on the file's time axis.
+- **SkNet connected first**: Connect to SkookumNet and receive at least one QSO before adding the file. SkNet becomes the reference log (REF) and the file is overlaid on SkNet's time axis.
+
+> **Exception:** If SkNet is connected but has 0 QSOs when the file is added, the file is promoted to reference log (same behavior as "file loaded first").
+
+| File anchor | SkNet anchor | File-first: X-axis origin | File-first: red line position | SkNet-first: X-axis origin | SkNet-first: red line position |
+|---|---|---|---|---|---|
+| Contest Start | Contest Start | File's Contest Start | FileCS + (now − SkNet CS) | SkNet's Contest Start | Current real time |
+| Contest Start | First QSO | File's Contest Start | FileCS + (now − SkNet FirstQSO) | SkNet's First QSO | Current real time |
+| First QSO | First QSO | File's First QSO | FileFirstQSO + (now − SkNet FirstQSO) | SkNet's First QSO | Current real time |
+| First QSO | Contest Start | File's First QSO | FileFirstQSO + (now − SkNet CS) | SkNet's Contest Start | Current real time |
+
+**How to read the red line:**
+
+- **File loaded first**: The red line shows where SkNet's current elapsed time (measured from its anchor) lands on the file's time axis. When both anchors point to the same time (e.g., both Contest Start at 00:00) the red line matches the current real time exactly. When anchors differ, the red line shifts by that difference.
+
+- **SkNet connected first**: SkNet is the reference, so the X-axis represents SkNet's real time directly. The red line always appears at the current real time.
+
+#### Examples
+
+Assume: contest starts 00:00, file's first QSO at 00:03, SkNet's first QSO at 00:05, current time 02:30.
+
+**File-first · both Contest Start anchors:**
+
+X-axis origin
+:   00:00 (contest start)
+
+Red line
+:   00:00 + (02:30 − 00:00) = **02:30** (equals current real time)
+
+**File-first · file = Contest Start / SkNet = First QSO anchor:**
+
+X-axis origin
+:   00:00 (contest start)
+
+Red line
+:   00:00 + (02:30 − 00:05) = **02:25** (5 minutes before current real time on the chart)
+
+**File-first · both First QSO anchors:**
+
+X-axis origin
+:   00:03 (file's first QSO)
+
+Red line
+:   00:03 + (02:30 − 00:05) = **02:28** (2 minutes before current real time on the chart)
+
+**SkNet connected first (same behavior regardless of anchor):**
+
+X-axis origin
+:   SkNet's anchor time (see column 5 of the table above)
+
+Red line
+:   always at current real time (in this example, **02:30**)
+
 ### Multi-station (multi-op)
 
 When multiple PCs are in the same SkookumNet session, use the **All** button in any pane to select which station to display.
@@ -676,7 +736,7 @@ When the Pane View is active, a **▲ Hide** button appears at the bottom-left o
 
 ## License
 
-BICHOK version 1.0.1  
+BICHOK version 1.0.2  
 Copyright © 2026 kondou  
 Released under the MIT License.
 
