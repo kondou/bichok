@@ -3714,7 +3714,7 @@ function renderCharts(qsos) {
     // x軸を経過時間表示に切り替え (H:MM elapsed、24h超は0に折り返し)
     cumulChart._dayAnchorMs = _mlRefAnchor;
     cumulChart.options.scales.x.ticks.callback = v => {
-      const el = v - _mlRefAnchor;
+      const el = v - startMs;
       const dayMs = 24 * 3600000;
       const wrapped = ((el % dayMs) + dayMs) % dayMs;
       return String(Math.floor(wrapped / 3600000)).padStart(2, '0') + ':' + String(Math.floor((wrapped % 3600000) / 60000)).padStart(2, '0');
@@ -5215,7 +5215,6 @@ function wsScheduleRender() {
       currentQsos = wsQsos.slice();
       _wsLiveQsos = null;
     }
-    console.log('[wsScheduleRender] renderCharts qsos=' + currentQsos.length);
     renderCharts(currentQsos);
     // renderCharts がラベルを上書きするので SkookumNet 用に戻す
     if (wsLiveMode) {
