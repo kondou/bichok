@@ -736,7 +736,7 @@ When the Pane View is active, a **▲ Hide** button appears at the bottom-left o
 
 ## License
 
-BICHOK version 1.0.2  
+BICHOK version 1.0.3  
 Copyright © 2026 kondou  
 Released under the MIT License.
 
