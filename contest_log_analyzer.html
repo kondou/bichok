@@ -1,5 +1,5 @@
 <!--
-  BICHOK — Contest Log Analyzer  v1.0.3
+  BICHOK — Contest Log Analyzer  v1.0.4
   Copyright (c) 2026 kondou
   Released under the MIT License.
 
@@ -668,7 +668,7 @@ body.compact #compact-btn { opacity: 1; color: var(--accent); border-color: var(
 
 <script>
 
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.0.4';
 document.title = 'BICHOK ver.' + APP_VERSION;
 
 // グリッドロケーター -> 緯度経度
@@ -1894,13 +1894,19 @@ function _openFullChartLogMenu(anchorEl) {
   setTimeout(() => document.addEventListener('click', () => menu.remove(), { once: true }), 0);
 }
 
+function _textChecksum(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (((h << 5) + h) + s.charCodeAt(i)) | 0;
+  return h;
+}
+
 // ログを_logStoreに追加して id を返す
 function _addLogEntry(qsos, label, opts = {}) {
   const id = _newLogId();
   const firstMs = qsos.length ? qsos[0].time.getTime() : Date.now();
   const contestStartMs = Math.floor(firstMs / 3600000) * 3600000; // first QSOをhour単位に切り捨て
-  const nonGroupCount = _logStore.filter(l => !l.isGroup).length;
-  const color = opts.color || LOG_COLORS[nonGroupCount % LOG_COLORS.length];
+  const usedColors = new Set(_logStore.filter(l => !l.isGroup).map(l => l.color));
+  const color = opts.color || LOG_COLORS.find(c => !usedColors.has(c)) || LOG_COLORS[usedColors.size % LOG_COLORS.length];
   const isFirst = _logStore.length === 0;
   _logStore.push({
     id, label: label || id, color, qsos,
@@ -1915,6 +1921,7 @@ function _addLogEntry(qsos, label, opts = {}) {
     station: opts.station || '',
     _isAdif: opts._isAdif !== undefined ? opts._isAdif : isAdif,
     _meta: opts._meta || null,  // { callsign, year, contestName }
+    _textHash: opts._textHash || null,
   });
   _multiLogMode = _logStore.filter(l => !l.isGroup).length > 1;
   return id;
@@ -3289,8 +3296,8 @@ function renderCharts(qsos) {
   // ライブモード: X軸をコンテスト全体に合わせて拡張
   if (wsLiveMode) {
     // 追加ログ読み込み時にX軸が縮まないよう、前回の正しい範囲を下限として維持
-    if (_multiLogMode && globalStartMs !== null && globalStartMs < startMs) startMs = globalStartMs;
-    if (_multiLogMode && globalEndMs   !== null && globalEndMs   > endMs)   endMs   = globalEndMs;
+    if (_multiLogMode && globalStartMs > 0 && globalStartMs < startMs) startMs = globalStartMs;
+    if (_multiLogMode && globalEndMs   > 0 && globalEndMs   > endMs)   endMs   = globalEndMs;
     const _liveEntry = _logStore.find(l => l.isLive && !l.isGroup);
     // コンテスト名から開始・終了時刻を確定（UTC欄の設定によらず常にこの値を使用）
     // 最初のQSOが日曜→2日目として前日土曜を開始とみなす。それ以外→1日目として当該土曜を使用
@@ -4150,6 +4157,7 @@ async function loadText(text, appendMode) {
     // 表示時の短縮は _logDistinctLabel() が担当
     const _loadYear = newQsos.length ? newQsos[0].time.getUTCFullYear() : null;
     const _loadMeta = { callsign: callsign || null, year: _loadYear, contestName: contestName || null };
+    const _loadTextHash = _textChecksum(text);
     function _makeLogLabel(fallback) {
       const parts = [];
       if (callsign) parts.push(callsign);
@@ -4160,21 +4168,22 @@ async function loadText(text, appendMode) {
 
     if (isAppend) {
       // ===== 追加モード =====
-      // 重複チェック: 同一コールサイン+年+コンテスト名のログが既に存在する場合はスキップ
-      if (_loadMeta.callsign || _loadMeta.year || _loadMeta.contestName) {
-        const _isDup = _logStore.some(l => {
-          if (!l._meta) return false;
-          return l._meta.callsign === _loadMeta.callsign &&
-                 l._meta.year === _loadMeta.year &&
-                 l._meta.contestName === _loadMeta.contestName;
-        });
-        if (_isDup) {
-          alert(i18n('duplicateLog'));
-          return;
-        }
+      // 重複チェック: ファイル内容ハッシュ一致、またはメタ情報(コールサイン+年+コンテスト名)が一致するログが既に存在する場合はスキップ
+      const _isDup = _logStore.some(l => {
+        if (l.isGroup) return false;
+        if (l._textHash && l._textHash === _loadTextHash) return true;
+        if (!l._meta) return false;
+        if (!(_loadMeta.callsign || _loadMeta.year || _loadMeta.contestName)) return false;
+        return l._meta.callsign === _loadMeta.callsign &&
+               l._meta.year === _loadMeta.year &&
+               l._meta.contestName === _loadMeta.contestName;
+      });
+      if (_isDup) {
+        alert(i18n('duplicateLog'));
+        return;
       }
       const label = _makeLogLabel('Log ' + (_logStore.length + 1));
-      const _addedLogId = _addLogEntry(newQsos, label, { _isAdif: isAdif, _meta: _loadMeta });
+      const _addedLogId = _addLogEntry(newQsos, label, { _isAdif: isAdif, _meta: _loadMeta, _textHash: _loadTextHash });
       _renderLogPanel();
       // SkookumNetがREFかつQSOなし: 新規静的ログをREFに昇格（SkookumNetを参照軸にすると空チャートになるため）
       if (wsLiveMode && wsQsos.length === 0) {
