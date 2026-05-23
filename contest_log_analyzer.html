@@ -1,5 +1,5 @@
 <!--
-  BICHOK — Contest Log Analyzer  v1.0.4
+  BICHOK — Contest Log Analyzer  v1.0.5
   Copyright (c) 2026 kondou
   Released under the MIT License.
 
@@ -668,7 +668,7 @@ body.compact #compact-btn { opacity: 1; color: var(--accent); border-color: var(
 
 <script>
 
-const APP_VERSION = '1.0.4';
+const APP_VERSION = '1.0.5';
 document.title = 'BICHOK ver.' + APP_VERSION;
 
 // グリッドロケーター -> 緯度経度
@@ -3323,6 +3323,8 @@ function renderCharts(qsos) {
       const _xRefAnchor = _xRef ? (_logAnchorMs(_xRef) || startMs) : startMs;
       for (const _xLog of _logStore) {
         if (!_isFullChartLogVisible(_xLog) || (_xRef && _xLog.id === _xRef.id)) continue;
+        // 終了済みコンテストのliveEntryはシフト後QSOがコンテスト期間外になるためendMs拡張をスキップ
+        if (_xLog.isLive && _xLog.contestStartMs && Date.now() - _xLog.contestStartMs > 3 * 86400000) continue;
         const _xQsos = _getLogQsos(_xLog);
         if (!_xQsos.length) continue;
         const _xShift = _xRefAnchor - (_logAnchorMs(_xLog) || 0) + _xLog.offsetMs;
@@ -3334,15 +3336,23 @@ function renderCharts(qsos) {
     // 現在時刻より2スロット先まで確保（nowラインが見えるように）
     if (_wsLiveQsos !== null && _liveEntry && _liveEntry.contestStartMs) {
       // Scenario A: 参照ログ時間軸上のnow位置で拡張（絶対時刻Date.now()は別年になるため使わない）
-      const _xRefB = _refLog();
-      const _refAnchorB = _xRefB ? (_logAnchorMs(_xRefB) || startMs) : startMs;
-      const _mappedNow = _refAnchorB + (Date.now() - _logAnchorMs(_liveEntry));
-      const _nowNeeded = Math.ceil((_mappedNow + slotWidthMs * 2) / slotWidthMs) * slotWidthMs;
-      if (_nowNeeded > endMs) endMs = _nowNeeded;
+      // コンテスト進行中（開始から3日以内）の場合のみ拡張する。過去ログ接続時はスキップ。
+      const _nowElapsed = Date.now() - _liveEntry.contestStartMs;
+      if (_nowElapsed >= 0 && _nowElapsed <= 3 * 86400000) {
+        const _xRefB = _refLog();
+        const _refAnchorB = _xRefB ? (_logAnchorMs(_xRefB) || startMs) : startMs;
+        const _mappedNow = _refAnchorB + _nowElapsed;
+        const _nowNeeded = Math.ceil((_mappedNow + slotWidthMs * 2) / slotWidthMs) * slotWidthMs;
+        if (_nowNeeded > endMs) endMs = _nowNeeded;
+      }
     } else if (_wsLiveQsos === null) {
-      // 通常モード: Date.now()まで確保（Scenario A中はライブエントリ未着でも絶対時刻で拡張しない）
-      const _nowNeeded = Math.ceil((Date.now() + slotWidthMs * 2) / slotWidthMs) * slotWidthMs;
-      if (_nowNeeded > endMs) endMs = _nowNeeded;
+      // 通常モード: コンテスト進行中（開始から3日以内）の場合のみDate.now()まで確保
+      const _liveEntryB = _logStore.find(l => l.isLive && !l.isGroup);
+      const _nowElapsedB = _liveEntryB?.contestStartMs ? Date.now() - _liveEntryB.contestStartMs : -1;
+      if (_nowElapsedB >= 0 && _nowElapsedB <= 3 * 86400000) {
+        const _nowNeeded = Math.ceil((Date.now() + slotWidthMs * 2) / slotWidthMs) * slotWidthMs;
+        if (_nowNeeded > endMs) endMs = _nowNeeded;
+      }
     }
   }
 
@@ -5222,7 +5232,15 @@ function wsScheduleRender() {
     const _wsRef = _refLog();
     if (_wsRef && !_wsRef.isLive) {
       currentQsos = _getLogQsos(_wsRef);
-      _wsLiveQsos = wsQsos.slice();
+      // コンテスト期間外のQSOを除外（終了済みコンテスト接続中に無効なQSOが来ても表示しない）
+      const _wsFltEntry = _logStore.find(l => l.isLive && !l.isGroup);
+      if (_wsFltEntry && _wsFltEntry.contestStartMs) {
+        const _durMsWs = _guessContestDurationMs(wsContestName || '');
+        const _wsContestEnd = _wsFltEntry.contestStartMs + (_durMsWs || 3 * 86400000);
+        _wsLiveQsos = wsQsos.filter(q => q.time.getTime() <= _wsContestEnd);
+      } else {
+        _wsLiveQsos = wsQsos.slice();
+      }
     } else {
       currentQsos = wsQsos.slice();
       _wsLiveQsos = null;
