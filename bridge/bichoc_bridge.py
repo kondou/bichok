@@ -48,9 +48,10 @@ def parse_arguments():
                         help='never transmit anything, so nothing this bridge does can upset SkookumLogger')
     parser.add_argument('--binary-version', default=BRIDGE_VERSION, metavar='NAME',
                         help='how this client identifies itself to peers (see README)')
-    parser.add_argument('--sync-existing-log', action='store_true',
-                        help='receive the log logged before this bridge started, by returning the peer\'s '
-                             'own version identifier to it (see README)')
+    parser.add_argument('--sync-existing-log', dest='sync_existing_log', action='store_true', default=True,
+                        help='receive the log from before this bridge started (the default)')
+    parser.add_argument('--no-sync-existing-log', dest='sync_existing_log', action='store_false',
+                        help='do not fetch the log from before this bridge started (see README)')
     parser.add_argument('--dump-peer-info', action='store_true',
                         help='print the raw archive of the first PeerInformation each peer sends')
     parser.add_argument('--logfile', default=DEFAULT_LOG, help='where to write the log')
@@ -86,10 +87,8 @@ def main():
     peer.dump_peer_info = arguments.dump_peer_info
     peer.binary_version = arguments.binary_version
     peer.sync_existing_log = arguments.sync_existing_log
-    if arguments.sync_existing_log:
-        logging.info("Returning the peer's own version identifier so it sends the log logged before "
-                     "we started. SkookumLogger will still show this bridge in red, because the QSO "
-                     "hash it compares next cannot be reproduced.")
+    if not arguments.sync_existing_log:
+        logging.info("Not fetching the log from before startup; only QSOs logged from now on will arrive.")
     if arguments.listen_only:
         logging.warning("Listening only: nothing will be transmitted, so this bridge will not appear "
                         "in SkookumLogger's peer table and a 5.x peer will not be asked for its log")

@@ -12,6 +12,8 @@ import logging
 from . import clock as vclock
 from . import protocol
 
+_HASH_MASK = 0xFFFFFFFFFFFFFFFF
+
 ADDED = 'added'
 UPDATED = 'updated'
 DELETED = 'deleted'
@@ -56,6 +58,22 @@ class QsoLog:
         self.qsos = {}
         self.clocks = {}
         self.node_clock = {}
+
+    def log_hash(self, include_deleted=True):
+        """The whole-log hash a peer advertises so others can tell whether their copies agree.
+
+        Constants follow the example client, read with its author's permission. The result is
+        order-dependent; we run over the QSOs in the order they entered the log, which for a fill
+        is sequence order. An empty log hashes to 1, not 0.
+        """
+        result = 1
+        for qso in self.qsos.values():
+            if not include_deleted and is_deleted(qso):
+                continue
+            mixed = (result + qso.qso_hash()) & _HASH_MASK
+            mixed = (31 * mixed) & _HASH_MASK
+            result = (result + mixed) & _HASH_MASK
+        return result
 
     def clear(self):
         """Drop everything. Used on an epoch reset and when a 5.x peer replaces the log."""

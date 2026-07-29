@@ -164,6 +164,10 @@ def test_peer_information_roundtrip():
     info.contestEndTime = now
     info.timestamp = now
 
+    # A hash with the top bit set: a signed 64-bit encode rejects this, and a real log hash
+    # lands here often enough that the first deleted QSO in live testing found the bug.
+    info.hashOfQSOs = 0x8000000000000001
+
     packet = [protocol.PEER_INFORMATION, now, info]
     data, error = NSKeyedArchiver.archivedDataWithRootObject_requiringSecureCoding_error_(packet, True, None)
     check('it archives', error, None)
@@ -179,13 +183,84 @@ def test_peer_information_roundtrip():
     check('the station name survives', str(payload.peerHostName), 'BicHoc')
     check('the clock survives', vclock.to_dict(payload.vectorClock), {'BicHoc': 0, 'Dismal': 7})
     check('the contest name survives', str(payload.contestName), 'CQ World Wide DX Contest CW')
+    check('a top-bit hash survives', payload.hashOfQSOs, 0x8000000000000001)
+
+
+def test_log_hash():
+    """The whole-log hash: empty is 1, deterministic, and order-dependent."""
+    print('log hash')
+
+    class Hashable:
+        """Stands in for a QSO whose per-QSO hash is already known."""
+        def __init__(self, value):
+            self.value = value
+            self.flags = 0
+        def qso_hash(self):
+            return self.value
+
+    def hash_of(values):
+        log = qsolog.QsoLog()
+        for index, value in enumerate(values):
+            log.qsos[index] = Hashable(value)
+        return log.log_hash()
+
+    check('an empty log hashes to 1', hash_of([]), 1)
+    check('the same QSOs give the same hash', hash_of([7, 11]), hash_of([7, 11]))
+    check('order changes the hash', hash_of([7, 11]) != hash_of([11, 7]), True)
+
+    tomb = Hashable(99)
+    tomb.flags = protocol.FLAG_DELETED
+    log = qsolog.QsoLog()
+    log.qsos[0] = Hashable(7)
+    log.qsos[1] = tomb
+    check('tombstones can be left out of the hash',
+          log.log_hash(include_deleted=False), hash_of([7]))
+
+
+def test_qso_hash():
+    """The per-QSO hash over real Foundation objects: deterministic, and sensitive to content."""
+    print('QSO hash')
+    from Foundation import NSDate, NSUUID, NSNumber, NSDictionary  # pylint: disable=import-outside-toplevel
+    from snet.objects import TransientQso, Exchange, EXCHANGE_FIELDS  # pylint: disable=import-outside-toplevel
+
+    def exchange(call):
+        made = Exchange.alloc().init()
+        for name in EXCHANGE_FIELDS:
+            setattr(made, name, '')
+        made.call = call
+        return made
+
+    def qso(callsign):
+        made = TransientQso.alloc().init()
+        made.identifier = NSUUID.alloc().initWithUUIDString_('F274A1E0-3A23-436E-AC0B-15614C6B2FD7')
+        made.timeStamp = NSDate.dateWithTimeIntervalSince1970_(806917764.0)
+        made.mainReceiveFrequency = NSNumber.numberWithLongLong_(14002000)
+        made.subReceiveFrequency = NSNumber.numberWithLongLong_(0)
+        made.transmitFrequency = NSNumber.numberWithLongLong_(14002000)
+        made.mode = 'CW'
+        made.sentExchange = exchange('JH5GHM')
+        made.receivedExchange = exchange(callsign)
+        made.operatorCall = 'JH5GHM'
+        made.stationName = 'Dismal'
+        made.notes = ''
+        made.flags = NSNumber.numberWithLongLong_(1)
+        made.sequenceID = NSNumber.numberWithLongLong_(1)
+        made.vectorClock = NSDictionary.dictionaryWithDictionary_({'Dismal': 1})
+        made.conflictInfo = None
+        made.lastModifiedBy = 'Dismal'
+        return made
+
+    check('the same QSO hashes the same', qso('W3KX').qso_hash(), qso('W3KX').qso_hash())
+    check('different content hashes differently',
+          qso('W3KX').qso_hash() != qso('DJ5AN').qso_hash(), True)
+    check('the hash fits in 64 bits', qso('W3KX').qso_hash() < 2 ** 64, True)
 
 
 def main():
     """Run every check and report."""
     for test in (test_clock_relationships, test_example_one, test_example_three,
                  test_no_action_cases, test_tombstones, test_identity,
-                 test_peer_information_roundtrip):
+                 test_peer_information_roundtrip, test_log_hash, test_qso_hash):
         test()
 
     print()

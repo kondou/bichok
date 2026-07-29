@@ -24,8 +24,8 @@ case `python3 bichoc_bridge.py` is enough.
     --host HOST             address to serve the browser on (default: localhost)
     --port PORT             port to serve the browser on (default: 2237)
     --service TYPE          Bonjour service type to advertise (default: skookumnetwork)
-    --binary-version NAME   how the bridge identifies itself to peers
-    --sync-existing-log     also receive the log from before the bridge started (see below)
+    --binary-version NAME    how the bridge identifies itself to peers
+    --no-sync-existing-log   do not fetch the log from before the bridge started (see below)
     --logfile PATH          where to write the log
     --debug                 log every packet
 
@@ -62,28 +62,22 @@ SkookumLogger sends a peer the events it is missing only when that peer's `binar
 its own exactly, down to the UUID of the SkookumLogger binary, which is not something a client from
 outside can produce.
 
-There are two ways round it.
+So, by default, the bridge does what the example client published by the SkookumNet author does:
+it adopts the first peer's identifier and returns it. That is enough to be sent the whole log
+immediately, and it keeps working across SkookumLogger updates because the identifier is read from
+the peer at connection time rather than written down here. The bridge also computes the same log
+hash SkookumLogger compares peers with, so once the log has arrived, SkookumLogger lists this
+bridge as a peer in good standing — a white row, no warnings. What remains:
 
-The plain one costs nothing: start the bridge before the contest and it sees everything. If it
-starts late, or restarts, export the log from SkookumLogger and load the file into the analyser
-page — the page merges a loaded log and the live feed in either order, so the live QSOs land on top
-of the file whichever arrives first.
-
-The other is `--sync-existing-log`, which returns the peer's own version identifier to it. That is
-enough to be sent the whole log immediately, and it keeps working across SkookumLogger updates
-because the identifier is read from the peer at connection time rather than written down here.
-What it costs:
-
-* SkookumLogger still shows this bridge in red, now reading "QSOs do not match", because the QSO
-  hash it compares next cannot be reproduced from outside. Nothing is wrong; the row simply says
-  so unhelpfully.
 * SkookumLogger records this bridge in its log's vector clock, as an entry at zero. It affects
   nothing and the reset button in the SkookumNet window clears it.
-* The Station column still reads BicHoc throughout, so nobody is looking at something that claims
-  to be SkookumLogger. Only the hidden version field matches.
+* The Station column reads BicHoc throughout. Only the hidden version field, visible in the row's
+  tooltip, carries the peer's identifier.
 
-Leave it off when other operators share the network — they would see a red row and a prompt to
-report a bug, about a bridge that is not theirs and is working correctly.
+`--no-sync-existing-log` turns this off; the bridge then identifies itself as itself and sees only
+the QSOs logged after it connected. Either way, a log exported from SkookumLogger can be loaded
+into the analyser page at any time — the page merges a loaded file and the live feed in either
+order.
 
 ## Epochs
 

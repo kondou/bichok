@@ -42,6 +42,25 @@ def _decode_int(decoder, key, default=0):
         return default
 
 
+_HASH_MASK = 0xFFFFFFFFFFFFFFFF
+
+
+def _field_hash(value):
+    """Foundation's hash of one QSO field, coercing the plain-Python defaults our decoder uses.
+
+    The log hash below has to agree with SkookumLogger, and SkookumLogger hashes Foundation
+    objects. Fields we decoded stay Foundation objects and hash natively; fields that fell back
+    to '' or 0 are wrapped first so they hash the way the real object would have.
+    """
+    if value is None:
+        return 0
+    if isinstance(value, str):
+        return NSString.stringWithString_(value).hash()
+    if isinstance(value, bool) or isinstance(value, int):
+        return NSNumber.numberWithUnsignedLongLong_(int(value) & _HASH_MASK).hash()
+    return value.hash()
+
+
 class Exchange(NSObject, protocols=[NSSecureCoding]):
     """One side of a contest exchange: twelve optional strings under a single 'fields' key."""
 
@@ -65,6 +84,11 @@ class Exchange(NSObject, protocols=[NSSecureCoding]):
     def as_dict(self):
         """Return the exchange as a plain dict of strings."""
         return {name: getattr(self, name, '') or '' for name in EXCHANGE_FIELDS}
+
+    def exchange_as_data(self):
+        """The twelve fields joined with ^ as UTF-8 NSData, which is how an exchange is hashed."""
+        joined = '^'.join(getattr(self, name, '') or '' for name in EXCHANGE_FIELDS)
+        return NSString.stringWithString_(joined).dataUsingEncoding_(4)  # NSUTF8StringEncoding
 
     def __str__(self):
         filled = {name: value for name, value in self.as_dict().items() if value}
@@ -124,6 +148,35 @@ class TransientQso(NSObject, protocols=[NSSecureCoding]):
         coder.encodeObject_forKey_(self.vectorClock, 'vectorClock')
         coder.encodeObject_forKey_(self.conflictInfo, 'conflictInfo')
         coder.encodeObject_forKey_(self.lastModifiedBy, 'lastModifiedBy')
+
+    def qso_hash(self):
+        """The per-QSO hash SkookumLogger compares logs with.
+
+        Constants and field order follow the example client, which we read with its author's
+        permission; the code is our own. Note that transmitFrequency is not part of the hash.
+        """
+        result = 1
+        for field_hash in (
+            _field_hash(self.identifier),
+            _field_hash(self.timeStamp),
+            _field_hash(self.mainReceiveFrequency),
+            _field_hash(self.subReceiveFrequency),
+            _field_hash(self.mode),
+            self.sentExchange.exchange_as_data().hash() if self.sentExchange is not None else 0,
+            self.receivedExchange.exchange_as_data().hash() if self.receivedExchange is not None else 0,
+            _field_hash(self.operatorCall),
+            _field_hash(self.stationName),
+            _field_hash(self.notes),
+            _field_hash(self.flags),
+            _field_hash(self.sequenceID),
+            _field_hash(self.vectorClock),
+            0 if self.conflictInfo is None else self.conflictInfo.hash(),
+            _field_hash(self.lastModifiedBy),
+        ):
+            mixed = (result + field_hash) & _HASH_MASK
+            mixed = (43 * mixed) & _HASH_MASK
+            result = (result + mixed) & _HASH_MASK
+        return result
 
     def __str__(self):
         call = self.receivedExchange.call if self.receivedExchange else ''
@@ -227,11 +280,10 @@ class PeerInformation(NSObject, protocols=[NSSecureCoding]):
         self.contestEndTime = _decode(decoder, _DATE, 'contestEndTime')
         self.timestamp = _decode(decoder, _DATE, 'timestamp')
 
-        # hashOfQSOs is deliberately left alone. Reading it back as an integer is rejected by the
-        # unarchiver, and a rejected key does not fail quietly -- it fails the whole packet, which
-        # then never reaches the code that decides which protocol to answer in. Nothing here uses
-        # the value, so the safest thing to do with it is nothing.
-        self.hashOfQSOs = 0
+        # An NSNumber object on the wire -- decodeIntegerForKey rejects it, which is what once
+        # made this field fail the whole packet. Read it as the object it is.
+        value = _decode(decoder, _NUMBER, 'hashOfQSOs')
+        self.hashOfQSOs = int(value.unsignedLongLongValue()) if value is not None else None
         return self
 
     def encodeWithCoder_(self, coder):
@@ -260,7 +312,10 @@ class PeerInformation(NSObject, protocols=[NSSecureCoding]):
         # which needs an object on both sides, and both a primitive and a missing key arrive as nil.
         # We cannot compute SkookumLogger's hash, so the number we send will not match it. Being
         # told we are out of sync is the honest answer anyway.
-        coder.encodeObject_forKey_(NSNumber.numberWithLongLong_(int(self.hashOfQSOs or 0)), 'hashOfQSOs')
+        # Unsigned: the hash is a full 64-bit value, and the signed variant rejects anything with
+        # the top bit set -- which a real log hash reaches as soon as the QSOs happen to land there.
+        coder.encodeObject_forKey_(
+            NSNumber.numberWithUnsignedLongLong_(int(self.hashOfQSOs or 0) & _HASH_MASK), 'hashOfQSOs')
 
     def __str__(self):
         return (f'Peer({self.peerHostName} mode={self.operatingMode} tx={self.transmitFocus} '

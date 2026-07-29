@@ -80,6 +80,7 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         self.contest_start = None
         self.contest_end = None
         self.peer_version = None
+        self.hash_agreed = None
         self.binary_version = None
         self.sync_existing_log = False
         return self
@@ -121,12 +122,12 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         info.syncEpoch = self.epoch
 
         # Everything below describes the contest we were invited to, echoed back from what the
-        # peers themselves advertise. We hold no QSOs of our own, so the hash stays at zero.
+        # peers themselves advertise.
         info.contestName = self.contest or ''
         info.contestStartTime = self.contest_start
         info.contestEndTime = self.contest_end
         info.timestamp = NSDate.date()
-        info.hashOfQSOs = 0
+        info.hashOfQSOs = self.log.log_hash()
 
         # SkookumLogger sends a peer the events it is missing only when this field matches its own
         # identifier exactly, down to the UUID of its binary. Nothing that is not SkookumLogger can
@@ -256,9 +257,9 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         """Note the new peer, but say nothing until it has shown us which protocol it speaks."""
         logging.info("%s joined; waiting to hear which protocol it speaks before transmitting", info['peer'])
         if self.sync_existing_log and len(self.session.connectedPeers()) > 1:
-            logging.warning("More than one peer is on the network while --sync-existing-log is in use. "
-                            "Other operators will see this bridge listed with their own version string; "
-                            "leave the option off if that would confuse anyone.")
+            logging.warning("More than one peer is on the network. Other operators will see this "
+                            "bridge listed with their own version string in its tooltip; start with "
+                            "--no-sync-existing-log if that would confuse anyone.")
         self.listener.session_started(self.contest)
 
     def lastPeerLeft_(self, info):
@@ -314,6 +315,29 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
             return
         logging.info("Raw PeerInformation archive from %s:\n%s",
                      peer, pprint.pformat(archive.get('$objects', archive), width=110))
+
+    @objc.python_method
+    def _compare_log_hash(self, info, peer):
+        """Say whether our copy of the log agrees with the one the peer advertises.
+
+        This is the comparison behind SkookumLogger's "QSOs do not match" tooltip, so knowing
+        which side of it we are on -- and logging the numbers when we are on the wrong side --
+        is what lets the hashing be calibrated against the real thing.
+        """
+        if info.hashOfQSOs is None:
+            return
+        ours = self.log.log_hash()
+        agreed = (ours == info.hashOfQSOs)
+        if agreed != self.hash_agreed:
+            self.hash_agreed = agreed
+            if agreed:
+                logging.info("Our copy of the log agrees with %s (hash %d over %d QSOs)",
+                             peer, ours, len(self.log.qsos))
+            else:
+                logging.info("Our copy of the log differs from %s: ours %d (%d QSOs, "
+                             "without tombstones %d), theirs %d",
+                             peer, ours, len(self.log.qsos),
+                             self.log.log_hash(include_deleted=False), info.hashOfQSOs)
 
     @objc.python_method
     def _learn_dialect(self, packet, peer):
@@ -421,6 +445,8 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
             self.contest_end = info.contestEndTime
         if info.contestName and not self.contest:
             self.contest = str(info.contestName)
+
+        self._compare_log_hash(info, peer)
 
         theirs = vclock.to_dict(info.vectorClock)
         self.known_stations.update(theirs)
