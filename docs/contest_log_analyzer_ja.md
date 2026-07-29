@@ -106,7 +106,7 @@ SkookumLogger / SkookumNet とリアルタイム連携することも可能。
 |------|------|
 | **SkookumLogger** | macOS 向けコンテストロギングソフトウェア |
 | **SkookumNet** | SkookumLogger 間で QSO 情報をリアルタイム共有するプロトコル。複数PCによる運用を想定 |
-| **skookumnet-client** | SkookumNet パケットを受信し、このツール（ブラウザでアクセス）へ WebSocket で中継する Python スクリプト |
+| **SkookumNet ブリッジ** | BicHoc に同梱の Python プログラム（`bridge/`）。SkookumLogger のピアとして SkookumNet に参加し、受け取った QSO をこのツール（ブラウザでアクセス）へ WebSocket で中継する。SkookumLogger のピア表には `BicHoc` として現れる |
 
 ### その他
 
@@ -145,9 +145,8 @@ contest_log_analyzer_en.html ← 英語のドキュメント
 ```
 contest_log_analyzer.html
 chart.min.js
-skookumnet_client.py        ← SkookumNet ↔ ブラウザ中継スクリプト
 start_skookumnet.command    ← ダブルクリックで起動するランチャー
-plugins/                    ← skookumnet_client.py が使用するプラグイン群
+bridge/                     ← SkookumNet ブリッジ本体（Python、MIT ライセンス）
 ```
 
 SkookumNet ライブ接続の詳細な起動手順は → [§17 SkookumNet ライブ接続](#17-skookumnet-ライブ接続)
@@ -515,21 +514,55 @@ WPX・WAE コンテストのログで Off Time が検出されると、コント
 
 ## 17. SkookumNet ライブ接続 {#17-skookumnet-ライブ接続}
 
-SkookumLogger の SkookumNet パケットをリアルタイムで受信して表示。
+SkookumLogger の QSO 情報をリアルタイムで受信して表示。BicHoc に同梱の **SkookumNet ブリッジ**（`bridge/`）が SkookumLogger のピアとして SkookumNet に参加し、受け取った QSO を WebSocket でブラウザへ中継する。
 
 ### 前提条件
 
-- macOS 上で skookumnet-client が起動していること
+- **macOS**（ブリッジは macOS の Multipeer Connectivity を使用するため、macOS 専用）
 - SkookumLogger が起動していること
+- SkookumNet ブリッジが起動していること（→ [ブリッジの起動](#ブリッジの起動)）
+- SkookumLogger と同じ L2 ネットワーク上にあること（同一 Mac 上で併用するのが最も簡単）
+- `uv` が導入されていること。未導入の場合はランチャーがインストールコマンドを表示する
 
-> **SkookumNet ボタンについて:** macOS 以外の環境ではボタンは表示されない。macOS であればボタンは表示されるが、skookumnet-client が未起動の状態で接続を試みた場合は接続エラーとなる。
+> **SkookumNet ボタンについて:** macOS 以外の環境ではボタンは表示されない。macOS であればボタンは常に表示されるが、ブリッジが未起動の状態で接続を試みた場合は接続エラーとなる（ブラウザからローカルファイルの有無を確認できないため、ブリッジの起動状態は接続を試みるまで判定できない）。
+
+### ブリッジの起動 {#ブリッジの起動}
+
+`start_skookumnet.command` をダブルクリックする。以下がまとめて行われる。
+
+1. `uv` が依存パッケージ（PyObjC / websockets）を一時環境へ自動導入する（初回のみ時間がかかる）
+2. ブリッジ（`bridge/bichoc_bridge.py`）が起動する
+3. `contest_log_analyzer.html` がブラウザで開く
+
+起動したターミナルウィンドウを閉じるとブリッジも停止する。ブリッジの動作ログは `bridge/bichoc-bridge.log`。
+
+コマンドラインから直接起動する場合:
 
 ```bash
-# skookumnet-client の起動（start_skookumnet.command をダブルクリックでも可）
-uv run python skookumnet_client.py
+uv run --no-project --python 3.13 \
+  --with pyobjc-framework-MultipeerConnectivity --with websockets \
+  python bridge/bichoc_bridge.py
 ```
 
-### 接続手順
+主なオプション（ランチャーに渡した引数はそのままブリッジへ渡される）:
+
+| オプション | 内容 |
+|---|---|
+| `--name NAME` | SkookumLogger のピア表に表示される名前（既定: `BicHoc`） |
+| `--port PORT` | ブラウザ向け WebSocket の待受ポート（既定: `2237`） |
+| `--no-sync-existing-log` | 起動前にログされた QSO を取得しない（→ [途中から起動した場合](#途中から起動した場合)） |
+| `--logfile PATH` | 動作ログの出力先 |
+| `--debug` | 全パケットを記録する |
+
+### SkookumLogger 側の操作
+
+1. SkookumLogger の **SkookumNet** ウィンドウを開く
+2. **新しいログを使い始めたときは、一度 Reset ボタンを押す。** ログの世代を示すエポックが発行される。エポックを発行できるのは SkookumLogger だけで、ブリッジは観測したエポックに従う
+3. **Join** をクリックする。Join するまで SkookumLogger は何も広告せず、ブリッジからは見えない
+
+ブリッジは `BicHoc` という名前でピア表に現れる。複数の SkookumLogger から同時に招待を受けることもできる。
+
+### ブラウザ側の接続手順
 
 ![SkookumNet接続パネル](images/K-1.png)
 
@@ -544,9 +577,17 @@ uv run python skookumnet_client.py
 
 ![SkookumNet LIVE接続中](images/K-2.png)
 
+### 途中から起動した場合 {#途中から起動した場合}
+
+ブリッジは接続時に、**それ以前にログされた QSO も含めてログ全量**を SkookumLogger から受け取る。コンテストの途中からブリッジを起動しても、ログの手動書き出しは不要。
+
+- 受信後、ブリッジは SkookumLogger と同じ方式でログのハッシュを計算して申告するため、SkookumLogger のピア表では警告のない正規のピア（白い行）として扱われる
+- 以後に SkookumLogger でログした QSO も、削除した QSO も追随する
+- `--no-sync-existing-log` を付けて起動した場合は、接続後にログされた QSO のみを受信する。過去分も見たいときは SkookumLogger からログを書き出してブラウザに読み込ませればよい（ファイルログとライブデータはどちらの順に読み込んでも正しく統合される → [アンカーと赤破線の挙動](#アンカーと赤破線の挙動)）
+
 ### ブラウザをリロードした場合
 
-ブラウザをリロードしても、skookumnet-client が起動したままであれば接続を再開するだけで現在のすべての QSO の情報が再び取り込まれる。skookumnet-client の再起動は不要。
+ブラウザをリロードしても、ブリッジが起動したままであれば接続を再開するだけで現在のすべての QSO の情報が再び取り込まれる。ブリッジの再起動は不要。
 
 ### 過去ログとの併用
 
@@ -642,7 +683,7 @@ X 軸起点
 - ペイン設定（時間幅・モード・表示ログ・ベースレート）
 - 表示設定（Rate/EMA/LOESS/ACCEL のオン・オフ）
 
-> SkookumNet ライブデータは保存されないため localStorage からは復元されないが、再接続することで skookumnet-client から全 QSO 情報を受け取る。
+> SkookumNet ライブデータは保存されないため localStorage からは復元されないが、再接続することで SkookumNet ブリッジから全 QSO 情報を受け取る。
 
 ---
 
@@ -684,10 +725,17 @@ X 軸起点
 - ブラウザのコンソール（F12 キー → Console タブ）でエラーに表示されている内容を確認
 
 ### SkookumNet に接続できない
-- skookumnet-client が起動しているか
-- SkookumLogger が起動しているか
-- ファイアウォールやセキュリティソフトがポート 2237 をブロックしていないか
+- SkookumNet ブリッジが起動しているか（`start_skookumnet.command` のターミナルウィンドウが開いたままか）
+- `uv` が導入されているか（未導入の場合、ランチャーがインストールコマンドを表示して終了する）
 - WebSocket URL が `ws://localhost:2237` になっているか
+- ファイアウォールやセキュリティソフトがポート 2237 をブロックしていないか
+
+### ブリッジには接続できるが QSO が届かない
+- SkookumLogger が起動しているか
+- SkookumLogger の **SkookumNet** ウィンドウで **Join** を実行したか。Join するまで SkookumLogger は何も広告しない
+- 新しいログで一度 **Reset** ボタンを押したか
+- ブリッジと SkookumLogger が同じ L2 ネットワーク上にあるか
+- 詳しい状況は `bridge/bichoc-bridge.log` を確認（`--debug` を付けて起動すると全パケットが記録される）
 
 ### ファイルが読み込めない
 - Cabrillo または ADIF 形式であるか
@@ -736,7 +784,7 @@ iPhone（Safari）等で利用可能。縦・横いずれの向きでも動作�
 
 ## ライセンス
 
-BICHOK version 1.0.5  
+BICHOK version 1.0.7  
 Copyright © 2026 kondou  
 MIT License にて公開。
 

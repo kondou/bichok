@@ -106,7 +106,7 @@ Technical terms used throughout this document. Refer back here as needed.
 |------|-------------|
 | **SkookumLogger** | A contest logging application for macOS. |
 | **SkookumNet** | The protocol used by SkookumLogger to share QSO data in real time between multiple instances (multi-PC operation). |
-| **skookumnet-client** | A Python script that receives SkookumNet packets and relays them to this tool (the browser) via WebSocket. |
+| **SkookumNet bridge** | The Python program bundled with BicHoc (`bridge/`). It joins SkookumNet as a peer of SkookumLogger and relays the QSOs it receives to this tool (the browser) over WebSocket. It appears as `BicHoc` in SkookumLogger's peer table. |
 
 ### Other
 
@@ -145,9 +145,8 @@ contest_log_analyzer_en.html ← documentation (English)
 ```
 contest_log_analyzer.html
 chart.min.js
-skookumnet_client.py        ← SkookumNet ↔ browser relay script
 start_skookumnet.command    ← double-click launcher
-plugins/                    ← plug-ins used by skookumnet_client.py
+bridge/                     ← the SkookumNet bridge itself (Python, MIT licence)
 ```
 
 For detailed SkookumNet startup instructions → [§17 SkookumNet Live Connection](#17-skookumnet-live-connection)
@@ -516,21 +515,55 @@ Use **+ Pane** to display several panes at once — for example, one showing all
 
 ## 17. SkookumNet Live Connection {#17-skookumnet-live-connection}
 
-Receive and display SkookumLogger's SkookumNet packets in real time.
+Receive and display SkookumLogger's QSOs in real time. The **SkookumNet bridge** bundled with BicHoc (`bridge/`) joins SkookumNet as a peer of SkookumLogger and relays the QSOs it receives to the browser over WebSocket.
 
 ### Prerequisites
 
-- skookumnet-client must be running on macOS.
+- **macOS** — the bridge uses macOS Multipeer Connectivity, so it is macOS-only.
 - SkookumLogger must be running.
+- The SkookumNet bridge must be running (→ [Starting the bridge](#starting-the-bridge)).
+- The bridge must be on the same Layer-2 network as SkookumLogger. Running both on the same Mac is the simplest arrangement.
+- `uv` must be installed. If it is not, the launcher prints the install command.
 
-> **SkookumNet button:** The button is not shown on non-macOS systems. On macOS it is always shown; if skookumnet-client is not running when you attempt to connect, a connection error will be reported.
+> **SkookumNet button:** The button is not shown on non-macOS systems. On macOS it is always shown; if the bridge is not running when you attempt to connect, a connection error will be reported. (The browser cannot check whether a local file exists, so the bridge's state cannot be known until a connection is attempted.)
+
+### Starting the bridge {#starting-the-bridge}
+
+Double-click `start_skookumnet.command`. This does everything at once:
+
+1. `uv` installs the dependencies (PyObjC and websockets) into a temporary environment — the first run takes a while.
+2. The bridge (`bridge/bichoc_bridge.py`) starts.
+3. `contest_log_analyzer.html` opens in your browser.
+
+Closing the terminal window that opened also stops the bridge. The bridge writes its own log to `bridge/bichoc-bridge.log`.
+
+To start it from the command line instead:
 
 ```bash
-# Launch skookumnet-client (or double-click start_skookumnet.command)
-uv run python skookumnet_client.py
+uv run --no-project --python 3.13 \
+  --with pyobjc-framework-MultipeerConnectivity --with websockets \
+  python bridge/bichoc_bridge.py
 ```
 
-### Connecting
+The main options (any argument given to the launcher is passed straight through to the bridge):
+
+| Option | Description |
+|---|---|
+| `--name NAME` | The name shown in SkookumLogger's peer table (default: `BicHoc`). |
+| `--port PORT` | The port the browser connects to over WebSocket (default: `2237`). |
+| `--no-sync-existing-log` | Do not fetch QSOs logged before the bridge started (→ [Starting mid-contest](#starting-mid-contest)). |
+| `--logfile PATH` | Where to write the bridge's log. |
+| `--debug` | Record every packet. |
+
+### On the SkookumLogger side
+
+1. Open SkookumLogger's **SkookumNet** window.
+2. **When you start using a new log, press the Reset button once.** This issues an epoch marking the generation of the log. Only SkookumLogger can issue one; the bridge follows whichever epoch it observes.
+3. Click **Join**. Until you do, SkookumLogger advertises nothing and the bridge cannot see it.
+
+The bridge appears in the peer table as `BicHoc`. It can be invited by several SkookumLoggers at the same time.
+
+### Connecting from the browser
 
 ![SkookumNet connection panel](images/en/K-1.png)
 
@@ -545,9 +578,17 @@ On successful connection:
 
 ![SkookumNet LIVE connected](images/en/K-2.png)
 
+### Starting mid-contest {#starting-mid-contest}
+
+On connecting, the bridge receives **the whole log** from SkookumLogger, including the QSOs logged before it started. Starting the bridge partway through a contest needs no manual log export.
+
+- Once the log has arrived, the bridge computes the log hash the same way SkookumLogger does and reports it, so SkookumLogger lists the bridge as a peer in good standing — a white row, no warnings.
+- QSOs logged afterwards, and QSOs deleted, are both followed.
+- With `--no-sync-existing-log`, the bridge sees only the QSOs logged after it connected. To see the earlier ones in that case, export the log from SkookumLogger and load it in the browser — a file log and the live feed merge correctly in either order (→ [Anchor and red-line behavior](#anchor-and-red-line-behavior)).
+
 ### After a browser reload
 
-If you reload the browser while skookumnet-client is still running, simply reconnecting will re-receive all current QSOs — no need to restart skookumnet-client.
+If you reload the browser while the bridge is still running, simply reconnecting will re-receive all current QSOs — no need to restart the bridge.
 
 ### Using alongside a historical log
 
@@ -643,7 +684,7 @@ What is saved:
 - Pane settings (time span, mode, displayed log, base rate)
 - Trend settings (Rate / EMA / LOESS / ACCEL on/off)
 
-> SkookumNet live data is not saved as a file and cannot be restored from localStorage — but reconnecting via SkookumNet will re-deliver all QSOs recorded since skookumnet-client started.
+> SkookumNet live data is not saved as a file and cannot be restored from localStorage — but reconnecting will re-deliver all QSOs from the SkookumNet bridge.
 
 ---
 
@@ -685,10 +726,17 @@ Both the main chart and panes support zoom and pan.
 - Open the browser console (F12 → Console tab) and check for error messages.
 
 ### Cannot connect to SkookumNet
-- Is skookumnet-client running?
-- Is SkookumLogger running?
-- Is a firewall or security software blocking port 2237?
+- Is the SkookumNet bridge running? (Is the terminal window opened by `start_skookumnet.command` still open?)
+- Is `uv` installed? Without it the launcher prints the install command and exits.
 - Is the WebSocket URL set to `ws://localhost:2237`?
+- Is a firewall or security software blocking port 2237?
+
+### The bridge connects but no QSOs arrive
+- Is SkookumLogger running?
+- Did you click **Join** in SkookumLogger's **SkookumNet** window? Until you do, SkookumLogger advertises nothing.
+- Did you press **Reset** once for a new log?
+- Are the bridge and SkookumLogger on the same Layer-2 network?
+- Check `bridge/bichoc-bridge.log` for details; starting the bridge with `--debug` records every packet.
 
 ### File will not load
 - Is the file in Cabrillo or ADIF format?
@@ -736,7 +784,7 @@ When the Pane View is active, a **▲ Hide** button appears at the bottom-left o
 
 ## License
 
-BICHOK version 1.0.5  
+BICHOK version 1.0.7  
 Copyright © 2026 kondou  
 Released under the MIT License.
 
