@@ -106,7 +106,7 @@ Technical terms used throughout this document. Refer back here as needed.
 |------|-------------|
 | **SkookumLogger** | A contest logging application for macOS. |
 | **SkookumNet** | The protocol used by SkookumLogger to share QSO data in real time between multiple instances (multi-PC operation). |
-| **SkookumNet bridge** | The Python program bundled with BicHoc (`bridge/`). It joins SkookumNet as a peer of SkookumLogger and relays the QSOs it receives to this tool (the browser) over WebSocket. It appears as `BicHoc` in SkookumLogger's peer table. |
+| **SkookumNet bridge** | The Python program bundled with BICHOK (`bridge/`). It joins SkookumNet as a peer of SkookumLogger and relays the QSOs it receives to this tool (the browser) over WebSocket. It appears as `BicHoc` in SkookumLogger's peer table. |
 
 ### Other
 
@@ -553,7 +553,7 @@ Use **+ Pane** to display several panes at once — for example, one showing all
 
 ## 17. SkookumNet Live Connection {#17-skookumnet-live-connection}
 
-Receive and display SkookumLogger's QSOs in real time. The **SkookumNet bridge** bundled with BicHoc (`bridge/`) joins SkookumNet as a peer of SkookumLogger and relays the QSOs it receives to the browser over WebSocket.
+Receive and display SkookumLogger's QSOs in real time. The **SkookumNet bridge** bundled with BICHOK (`bridge/`) joins SkookumNet as a peer of SkookumLogger and relays the QSOs it receives to the browser over WebSocket.
 
 ### Prerequisites
 
@@ -825,7 +825,7 @@ When the Pane View is active, a **▲ Hide** button appears at the bottom-left o
 
 ## License
 
-BICHOK version 1.0.7  
+BICHOK version 1.0.8  
 Copyright © 2026 kondou  
 Released under the MIT License.
 

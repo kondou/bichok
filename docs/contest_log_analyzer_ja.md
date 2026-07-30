@@ -106,7 +106,7 @@ SkookumLogger / SkookumNet とリアルタイム連携することも可能。
 |------|------|
 | **SkookumLogger** | macOS 向けコンテストロギングソフトウェア |
 | **SkookumNet** | SkookumLogger 間で QSO 情報をリアルタイム共有するプロトコル。複数PCによる運用を想定 |
-| **SkookumNet ブリッジ** | BicHoc に同梱の Python プログラム（`bridge/`）。SkookumLogger のピアとして SkookumNet に参加し、受け取った QSO をこのツール（ブラウザでアクセス）へ WebSocket で中継する。SkookumLogger のピア表には `BicHoc` として現れる |
+| **SkookumNet ブリッジ** | BICHOK に同梱の Python プログラム（`bridge/`）。SkookumLogger のピアとして SkookumNet に参加し、受け取った QSO をこのツール（ブラウザでアクセス）へ WebSocket で中継する。SkookumLogger のピア表には `BicHoc` として現れる |
 
 ### その他
 
@@ -552,7 +552,7 @@ WPX・WAE コンテストのログで Off Time が検出されると、コント
 
 ## 17. SkookumNet ライブ接続 {#17-skookumnet-ライブ接続}
 
-SkookumLogger の QSO 情報をリアルタイムで受信して表示。BicHoc に同梱の **SkookumNet ブリッジ**（`bridge/`）が SkookumLogger のピアとして SkookumNet に参加し、受け取った QSO を WebSocket でブラウザへ中継する。
+SkookumLogger の QSO 情報をリアルタイムで受信して表示。BICHOK に同梱の **SkookumNet ブリッジ**（`bridge/`）が SkookumLogger のピアとして SkookumNet に参加し、受け取った QSO を WebSocket でブラウザへ中継する。
 
 ### 前提条件
 
@@ -825,7 +825,7 @@ iPhone（Safari）等で利用可能。縦・横いずれの向きでも動作�
 
 ## ライセンス
 
-BICHOK version 1.0.7  
+BICHOK version 1.0.8  
 Copyright © 2026 kondou  
 MIT License にて公開。
 
