@@ -123,30 +123,66 @@ SkookumLogger / SkookumNet とリアルタイム連携することも可能。
 
 `contest_log_analyzer.html` をブラウザで開いて利用する。インターネット接続・インストール・サーバーは不要（SkookumNet 連携時には他の SkookumLogger と同じ L2 ネットワークへの接続が必要）。
 
-**ツール本体は OS を問わず動作する。** SkookumNet ライブ接続のみ macOS を必要とし、macOS 以外の環境では **SkookumNet** ボタンが表示されないだけで、他のすべての機能はそのまま利用できる。
+**ツール本体は OS を問わず動作する。** ページはファイルのまま動作するため、サーバーも Python も必要ない。SkookumNet ライブ接続のみ macOS を必要とし、macOS 以外の環境では **SkookumNet** ボタンが表示されないだけで、他のすべての機能はそのまま利用できる。
 
 ![初期画面](images/A-1.png)
 
-### 動作確認済みブラウザ
-- Google Chrome / Chromium
-- Safari
-- Firefox
-- Edge
+### 対応環境
+
+| 環境 | ログファイルの分析 | SkookumNet ライブ接続 |
+|---|---|---|
+| macOS | ○ | ○ |
+| Windows | ○ | −（ボタンが表示されない） |
+| Linux | ○ | −（ボタンが表示されない） |
+| WSL2 | ○ | −（ボタンが表示されない） |
+
+動作確認済みブラウザ: Google Chrome / Chromium、Safari、Firefox、Edge
+
+### 起動方法
+
+**macOS**
+
+`contest_log_analyzer.html` をダブルクリックする。SkookumNet ライブ接続を使う場合は代わりに `start_skookumnet.command` をダブルクリックすると、ブリッジの起動とページの表示がまとめて行われる（→ [§17](#17-skookumnet-ライブ接続)）。
+
+> **初回のみ:** ダウンロードした zip 由来の `start_skookumnet.command` は初回だけ macOS にブロックされるため、右クリック →「開く」で起動する。2回目以降はダブルクリックでよい
+
+**Windows**
+
+`contest_log_analyzer.html` をダブルクリックする。既定のブラウザで開かない場合は `start_bichok.bat` を使う。
+
+> **「発行元を確認できませんでした」という警告が出る場合:** そのまま「実行」をクリックすれば起動する。毎回出るのを止めたい場合は、展開したフォルダで PowerShell を開いて以下を実行する:
+> ```powershell
+> Get-ChildItem -Recurse | Unblock-File
+> ```
+
+**Linux**
+
+`contest_log_analyzer.html` をブラウザで開く。ターミナルから `bash start_bichok.sh` としてもよい（既定のブラウザで開く）。
+
+**WSL2**
+
+Linux 側にあるファイルを Windows 側のブラウザに渡す必要があるため、WSL2 のターミナルから起動する。
+
+```bash
+bash ~/bichok/start_bichok.sh
+```
+
+> `wslu`（`sudo apt install wslu`）が導入されていれば Windows 側の既定ブラウザが自動で開く。未導入でもファイルのパスが表示されるので、それをブラウザで開けばよい
 
 ### ファイル構成
 
-**ログファイル分析のみ（SkookumNet なし）**
+**すべての環境**
 ```
 contest_log_analyzer.html    ← ブラウザで開くとツールが動作
 chart.min.js                 ← 同じフォルダに必要（グラフ描画ライブラリ）
+start_bichok.bat             ← Windows 用ランチャー（任意）
+start_bichok.sh              ← Linux / WSL2 用ランチャー（任意）
 contest_log_analyzer_ja.html ← 日本語のドキュメント
 contest_log_analyzer_en.html ← 英語のドキュメント
 ```
 
-**SkookumNet ライブ接続を使用する場合（macOS のみ）**
+**SkookumNet ライブ接続を使用する場合（macOS のみ、上記に加えて）**
 ```
-contest_log_analyzer.html
-chart.min.js
 start_skookumnet.command    ← ダブルクリックで起動するランチャー
 bridge/                     ← SkookumNet ブリッジ本体（Python、MIT ライセンス）
 ```
@@ -725,6 +761,9 @@ X 軸起点
 ### グラフが表示されない
 - `chart.min.js` が `contest_log_analyzer.html` と同じフォルダに存在しているか
 - ブラウザのコンソール（F12 キー → Console タブ）でエラーに表示されている内容を確認
+
+### SkookumNet ボタンが表示されない
+- macOS 以外の環境では**仕様として表示されない**（ブリッジが macOS の機能を使うため）。ログファイルの分析を含む他の機能はそのまま利用できる → [対応環境](#2-起動と基本操作)
 
 ### SkookumNet に接続できない
 - SkookumNet ブリッジが起動しているか（`start_skookumnet.command` のターミナルウィンドウが開いたままか）

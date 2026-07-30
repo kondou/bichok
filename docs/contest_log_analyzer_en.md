@@ -123,30 +123,66 @@ Technical terms used throughout this document. Refer back here as needed.
 
 Open `contest_log_analyzer.html` in a browser — no internet connection, installation, or server required. (SkookumNet live connection requires being on the same Layer-2 network as SkookumLogger.)
 
-**The tool itself runs on any operating system.** Only the SkookumNet live connection needs macOS; elsewhere the **SkookumNet** button is simply not shown, and every other function remains available.
+**The tool itself runs on any operating system.** The page runs straight from the filesystem, so neither a server nor Python is needed. Only the SkookumNet live connection needs macOS; elsewhere the **SkookumNet** button is simply not shown, and every other function remains available.
 
 ![Initial screen](images/en/A-1.png)
 
-### Tested browsers
-- Google Chrome / Chromium
-- Safari
-- Firefox
-- Edge
+### Supported platforms
+
+| Platform | Log file analysis | SkookumNet live connection |
+|---|---|---|
+| macOS | Yes | Yes |
+| Windows | Yes | No — the button is not shown |
+| Linux | Yes | No — the button is not shown |
+| WSL2 | Yes | No — the button is not shown |
+
+Tested browsers: Google Chrome / Chromium, Safari, Firefox, Edge.
+
+### Starting the tool
+
+**macOS**
+
+Double-click `contest_log_analyzer.html`. To use the SkookumNet live connection, double-click `start_skookumnet.command` instead — it starts the bridge and opens the page in one step (→ [§17](#17-skookumnet-live-connection)).
+
+> **First run only:** macOS blocks `start_skookumnet.command` the first time when it came from a downloaded zip. Right-click it and choose Open; double-clicking works from then on.
+
+**Windows**
+
+Double-click `contest_log_analyzer.html`. If that does not open your default browser, use `start_bichok.bat`.
+
+> **If you get "The publisher could not be verified":** clicking Run starts it anyway. To stop the warning appearing every time, open PowerShell in the extracted folder and run:
+> ```powershell
+> Get-ChildItem -Recurse | Unblock-File
+> ```
+
+**Linux**
+
+Open `contest_log_analyzer.html` in your browser, or run `bash start_bichok.sh` from a terminal to open it in the default browser.
+
+**WSL2**
+
+The files live on the Linux side and have to be handed to the Windows-side browser, so start it from a WSL2 terminal:
+
+```bash
+bash ~/bichok/start_bichok.sh
+```
+
+> With `wslu` installed (`sudo apt install wslu`) the Windows default browser opens automatically. Without it the script prints the path to the file, which you can open in the browser yourself.
 
 ### File layout
 
-**Log file analysis only (no SkookumNet)**
+**Every platform**
 ```
 contest_log_analyzer.html    ← open this in your browser
 chart.min.js                 ← must be in the same folder (charting library)
+start_bichok.bat             ← launcher for Windows (optional)
+start_bichok.sh              ← launcher for Linux / WSL2 (optional)
 contest_log_analyzer_ja.html ← documentation (Japanese)
 contest_log_analyzer_en.html ← documentation (English)
 ```
 
-**With SkookumNet live connection (macOS only)**
+**With SkookumNet live connection (macOS only, in addition to the above)**
 ```
-contest_log_analyzer.html
-chart.min.js
 start_skookumnet.command    ← double-click launcher
 bridge/                     ← the SkookumNet bridge itself (Python, MIT licence)
 ```
@@ -726,6 +762,9 @@ Both the main chart and panes support zoom and pan.
 ### Chart does not appear
 - Verify that `chart.min.js` is in the same folder as `contest_log_analyzer.html`.
 - Open the browser console (F12 → Console tab) and check for error messages.
+
+### The SkookumNet button is not shown
+- On anything other than macOS this is **by design** — the bridge relies on a macOS facility. Every other function, log file analysis included, remains available → [Supported platforms](#2-getting-started)
 
 ### Cannot connect to SkookumNet
 - Is the SkookumNet bridge running? (Is the terminal window opened by `start_skookumnet.command` still open?)
