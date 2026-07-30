@@ -1,6 +1,6 @@
 """Relays SkookumNet QSOs to the browser over a WebSocket.
 
-BicHoc's analyser page connects here and receives the log as JSON. The message shapes below are
+BicHok's analyser page connects here and receives the log as JSON. The message shapes below are
 the contract with that page, so they change only when the page changes.
 
 The QSOs are cached as they arrive so a browser that connects late, or reloads, gets the current

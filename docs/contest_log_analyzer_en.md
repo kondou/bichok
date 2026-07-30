@@ -106,7 +106,7 @@ Technical terms used throughout this document. Refer back here as needed.
 |------|-------------|
 | **SkookumLogger** | A contest logging application for macOS. |
 | **SkookumNet** | The protocol used by SkookumLogger to share QSO data in real time between multiple instances (multi-PC operation). |
-| **SkookumNet bridge** | The Python program bundled with BicHok (`bridge/`). It joins SkookumNet as a peer of SkookumLogger and relays the QSOs it receives to this tool (the browser) over WebSocket. It appears as `BicHoc` in SkookumLogger's peer table. |
+| **SkookumNet bridge** | The Python program bundled with BicHok (`bridge/`). It joins SkookumNet as a peer of SkookumLogger and relays the QSOs it receives to this tool (the browser) over WebSocket. It appears as `BicHok` in SkookumLogger's peer table. |
 
 ### Other
 
@@ -587,7 +587,7 @@ The main options (any argument given to the launcher is passed straight through 
 
 | Option | Description |
 |---|---|
-| `--name NAME` | The name shown in SkookumLogger's peer table (default: `BicHoc`). |
+| `--name NAME` | The name shown in SkookumLogger's peer table (default: `BicHok`). |
 | `--port PORT` | The port the browser connects to over WebSocket (default: `2237`). |
 | `--no-sync-existing-log` | Do not fetch QSOs logged before the bridge started (→ [Starting mid-contest](#starting-mid-contest)). |
 | `--logfile PATH` | Where to write the bridge's log. |
@@ -599,7 +599,7 @@ The main options (any argument given to the launcher is passed straight through 
 2. **When you start using a new log, press the Reset button once.** This issues an epoch marking the generation of the log. Only SkookumLogger can issue one; the bridge follows whichever epoch it observes.
 3. Click **Join**. Until you do, SkookumLogger advertises nothing and the bridge cannot see it.
 
-The bridge appears in the peer table as `BicHoc`. It can be invited by several SkookumLoggers at the same time.
+The bridge appears in the peer table as `BicHok`. It can be invited by several SkookumLoggers at the same time.
 
 ### Connecting from the browser
 
@@ -825,7 +825,7 @@ When the Pane View is active, a **▲ Hide** button appears at the bottom-left o
 
 ## License
 
-BicHok version 1.0.9  
+BicHok version 1.0.10  
 Copyright © 2026 kondou  
 Released under the MIT License.
 

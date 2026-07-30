@@ -156,8 +156,8 @@ def test_peer_information_roundtrip():
     from snet.objects import PeerInformation, allowed_classes          # pylint: disable=import-outside-toplevel
 
     now = NSDate.date()
-    info = PeerInformation.alloc().initWithStationName_('BicHoc')
-    info.vectorClock = {'BicHoc': 0, 'Dismal': 7}
+    info = PeerInformation.alloc().initWithStationName_('BicHok')
+    info.vectorClock = {'BicHok': 0, 'Dismal': 7}
     info.syncEpoch = now
     info.contestName = 'CQ World Wide DX Contest CW'
     info.contestStartTime = now
@@ -180,8 +180,8 @@ def test_peer_information_roundtrip():
     tag, epoch, payload = protocol.split_packet(decoded)
     check('the tag survives', tag, protocol.PEER_INFORMATION)
     check('the epoch survives', epoch is not None, True)
-    check('the station name survives', str(payload.peerHostName), 'BicHoc')
-    check('the clock survives', vclock.to_dict(payload.vectorClock), {'BicHoc': 0, 'Dismal': 7})
+    check('the station name survives', str(payload.peerHostName), 'BicHok')
+    check('the clock survives', vclock.to_dict(payload.vectorClock), {'BicHok': 0, 'Dismal': 7})
     check('the contest name survives', str(payload.contestName), 'CQ World Wide DX Contest CW')
     check('a top-bit hash survives', payload.hashOfQSOs, 0x8000000000000001)
 

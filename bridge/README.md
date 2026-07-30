@@ -20,7 +20,7 @@ wheels and tries to build them from source. Any Python 3.13 or newer with
 `pyobjc-framework-MultipeerConnectivity` and `websockets` installed will do just as well, in which
 case `python3 bichoc_bridge.py` is enough.
 
-    --name NAME             how the bridge appears in SkookumLogger (default: BicHoc)
+    --name NAME             how the bridge appears in SkookumLogger (default: BicHok)
     --host HOST             address to serve the browser on (default: localhost)
     --port PORT             port to serve the browser on (default: 2237)
     --service TYPE          Bonjour service type to advertise (default: skookumnetwork)
@@ -71,7 +71,7 @@ bridge as a peer in good standing — a white row, no warnings. What remains:
 
 * SkookumLogger records this bridge in its log's vector clock, as an entry at zero. It affects
   nothing and the reset button in the SkookumNet window clears it.
-* The Station column reads BicHoc throughout. Only the hidden version field, visible in the row's
+* The Station column reads BicHok throughout. Only the hidden version field, visible in the row's
   tooltip, carries the peer's identifier.
 
 `--no-sync-existing-log` turns this off; the bridge then identifies itself as itself and sees only

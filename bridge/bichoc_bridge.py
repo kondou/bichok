@@ -26,13 +26,13 @@ DEFAULT_LOG = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bichoc-
 
 # Deliberately not the machine's station name: SkookumLogger derives that from the host name, and
 # this bridge usually runs on the same Mac, so reusing it would collide with SkookumLogger itself.
-DEFAULT_PEER_NAME = 'BicHoc'
+DEFAULT_PEER_NAME = 'BicHok'
 
 # Sent as binaryVersion. SkookumLogger only sends a peer the log it is missing when this matches
 # its own identifier exactly, down to the UUID of its binary, so nothing we can honestly call
 # ourselves will earn a fill. We say who we are anyway: it is better than a blank in its peer
 # table, it costs nothing, and it is already the right answer if that check is ever relaxed.
-BRIDGE_VERSION = 'BicHoc-1.0'
+BRIDGE_VERSION = 'BicHok-1.0'
 
 
 def parse_arguments():

@@ -106,7 +106,7 @@ SkookumLogger / SkookumNet とリアルタイム連携することも可能。
 |------|------|
 | **SkookumLogger** | macOS 向けコンテストロギングソフトウェア |
 | **SkookumNet** | SkookumLogger 間で QSO 情報をリアルタイム共有するプロトコル。複数PCによる運用を想定 |
-| **SkookumNet ブリッジ** | BicHok に同梱の Python プログラム（`bridge/`）。SkookumLogger のピアとして SkookumNet に参加し、受け取った QSO をこのツール（ブラウザでアクセス）へ WebSocket で中継する。SkookumLogger のピア表には `BicHoc` として現れる |
+| **SkookumNet ブリッジ** | BicHok に同梱の Python プログラム（`bridge/`）。SkookumLogger のピアとして SkookumNet に参加し、受け取った QSO をこのツール（ブラウザでアクセス）へ WebSocket で中継する。SkookumLogger のピア表には `BicHok` として現れる |
 
 ### その他
 
@@ -586,7 +586,7 @@ uv run --no-project --python 3.13 \
 
 | オプション | 内容 |
 |---|---|
-| `--name NAME` | SkookumLogger のピア表に表示される名前（既定: `BicHoc`） |
+| `--name NAME` | SkookumLogger のピア表に表示される名前（既定: `BicHok`） |
 | `--port PORT` | ブラウザ向け WebSocket の待受ポート（既定: `2237`） |
 | `--no-sync-existing-log` | 起動前にログされた QSO を取得しない（→ [途中から起動した場合](#途中から起動した場合)） |
 | `--logfile PATH` | 動作ログの出力先 |
@@ -598,7 +598,7 @@ uv run --no-project --python 3.13 \
 2. **新しいログを使い始めたときは、一度 Reset ボタンを押す。** ログの世代を示すエポックが発行される。エポックを発行できるのは SkookumLogger だけで、ブリッジは観測したエポックに従う
 3. **Join** をクリックする。Join するまで SkookumLogger は何も広告せず、ブリッジからは見えない
 
-ブリッジは `BicHoc` という名前でピア表に現れる。複数の SkookumLogger から同時に招待を受けることもできる。
+ブリッジは `BicHok` という名前でピア表に現れる。複数の SkookumLogger から同時に招待を受けることもできる。
 
 ### ブラウザ側の接続手順
 
@@ -825,7 +825,7 @@ iPhone（Safari）等で利用可能。縦・横いずれの向きでも動作�
 
 ## ライセンス
 
-BicHok version 1.0.9  
+BicHok version 1.0.10  
 Copyright © 2026 kondou  
 MIT License にて公開。
 
