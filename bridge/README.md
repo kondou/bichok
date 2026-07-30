@@ -1,6 +1,6 @@
-# BicHoc SkookumNet bridge
+# BicHok SkookumNet bridge
 
-Feeds a live SkookumLogger log into BicHoc's analyser page. Run it next to SkookumLogger, join
+Feeds a live SkookumLogger log into BicHok's analyser page. Run it next to SkookumLogger, join
 SkookumNet there, and open the page: QSOs appear as they are logged.
 
 This is a listening peer. It advertises itself so SkookumLogger can invite it, and broadcasts its

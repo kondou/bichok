@@ -1,7 +1,7 @@
 #!/bin/bash
-# BicHoc launcher for Linux and WSL2 (it works on macOS too).
+# BicHok launcher for Linux and WSL2 (it works on macOS too).
 #
-# BicHoc is a single page that runs straight from the filesystem: there is no
+# BicHok is a single page that runs straight from the filesystem: there is no
 # server to start and nothing to install, so this script only opens the page in
 # your default browser. Opening contest_log_analyzer.html by hand does the same
 # thing; this exists mainly for WSL2, where the page has to be handed to the

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bridges a SkookumLogger session to BicHoc's analyser page.
+"""Bridges a SkookumLogger session to BicHok's analyser page.
 
 Run this alongside SkookumLogger, join SkookumNet in SkookumLogger, and open the analyser page.
 QSOs then appear in the page as they are logged.

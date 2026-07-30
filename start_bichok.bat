@@ -1,7 +1,7 @@
 @echo off
-REM BicHoc launcher for Windows.
+REM BicHok launcher for Windows.
 REM
-REM BicHoc is a single page that runs straight from the filesystem: there is no
+REM BicHok is a single page that runs straight from the filesystem: there is no
 REM server to start and nothing to install, so this only opens the page in your
 REM default browser. Double-clicking contest_log_analyzer.html does the same
 REM thing; this exists so there is one obvious way in on every platform.

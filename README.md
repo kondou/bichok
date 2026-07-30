@@ -1,8 +1,8 @@
-# BICHOK
+# BicHok
 
 [日本語 README](README.ja.md)
 
-BICHOK visualises amateur-radio contest logs in a browser: cumulative QSOs, rate
+BicHok visualises amateur-radio contest logs in a browser: cumulative QSOs, rate
 and its trends, band breakdown, and the operating mode you were actually in
 (Run, S&P, SO2R, 2BSIQ) reconstructed from the log itself. Load two logs and
 they are drawn on one time axis for comparison. On macOS it can also follow a
@@ -11,7 +11,7 @@ contest live from SkookumLogger, as it is being logged.
 The name is short for Butt In Chair, Hands On Keyboard, and is pronounced
 bikhɔ́k.
 
-![BICHOK screenshot](docs/images/en/A-2.png)
+![BicHok screenshot](docs/images/en/A-2.png)
 
 ## Features
 
@@ -83,7 +83,7 @@ To update, extract a newer zip over the same folder and confirm overwrite.
 Nothing outside the folder is involved, and there is no data of your own in it —
 saved sessions live in the browser.
 
-BICHOK needs no internet connection and never sends your log anywhere. Its only
+BicHok needs no internet connection and never sends your log anywhere. Its only
 network use is the WebSocket to the SkookumNet bridge, which runs on your own
 machine.
 
