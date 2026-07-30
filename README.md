@@ -53,9 +53,10 @@ works. A log exported from any logger can still be loaded as a file.
 
 ## Quick start
 
-1. Download the zip from the [latest release](https://github.com/kondou/bichok/releases/latest)
+1. Download the [latest release zip](https://github.com/kondou/bichok/releases/latest/download/bichok-latest.zip)
    (or clone this repository) and extract it anywhere you like — the folder name
-   does not matter. Keep `contest_log_analyzer.html` and `chart.min.js`
+   does not matter. That link always points to the newest version, so it is
+   worth bookmarking. Keep `contest_log_analyzer.html` and `chart.min.js`
    together.
 2. Open the page:
    - **Windows** — double-click `contest_log_analyzer.html`, or run
@@ -75,6 +76,12 @@ works. A log exported from any logger can still be loaded as a file.
 > ```powershell
 > Get-ChildItem -Recurse | Unblock-File
 > ```
+> Files from a freshly downloaded zip carry the internet-zone mark again, so
+> re-run this after updating.
+
+To update, extract a newer zip over the same folder and confirm overwrite.
+Nothing outside the folder is involved, and there is no data of your own in it —
+saved sessions live in the browser.
 
 BICHOK needs no internet connection and never sends your log anywhere. Its only
 network use is the WebSocket to the SkookumNet bridge, which runs on your own

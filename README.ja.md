@@ -50,9 +50,10 @@ QSO 数とレート、そのトレンド、バンド別の内訳、そしてロ�
 
 ## クイックスタート
 
-1. [最新リリース](https://github.com/kondou/bichok/releases/latest)から zip を
-   ダウンロード（またはこのリポジトリを clone）し、好きな場所に展開する。フォルダ名は
-   問わない。`contest_log_analyzer.html` と `chart.min.js` は同じフォルダに置くこと
+1. [最新リリースの zip](https://github.com/kondou/bichok/releases/latest/download/bichok-latest.zip)
+   をダウンロード（またはこのリポジトリを clone）し、好きな場所に展開する。フォルダ名は
+   問わない。このリンクは常に最新版を指すのでブックマーク推奨。
+   `contest_log_analyzer.html` と `chart.min.js` は同じフォルダに置くこと
 2. ページを開く:
    - **Windows** — `contest_log_analyzer.html` をダブルクリックする。ブラウザで開かない
      場合は `start_bichok.bat` を使う
@@ -71,6 +72,11 @@ QSO 数とレート、そのトレンド、バンド別の内訳、そしてロ�
 > ```powershell
 > Get-ChildItem -Recurse | Unblock-File
 > ```
+> 新しくダウンロードした zip 由来のファイルには改めてインターネットゾーンのマークが
+> 付くため、更新のたびに再実行すること。
+
+更新は、新しい zip を同じフォルダに上書き展開すればよい。フォルダ外には何も置かず、
+自分のデータも入っていない（保存したセッションはブラウザ側にある）。
 
 BICHOK はインターネット接続を必要とせず、ログを外部へ送信することもない。
 ネットワークを使うのは、同じマシン上で動く SkookumNet ブリッジへの WebSocket のみ。
