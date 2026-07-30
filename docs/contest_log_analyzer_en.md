@@ -123,6 +123,8 @@ Technical terms used throughout this document. Refer back here as needed.
 
 Open `contest_log_analyzer.html` in a browser — no internet connection, installation, or server required. (SkookumNet live connection requires being on the same Layer-2 network as SkookumLogger.)
 
+**The tool itself runs on any operating system.** Only the SkookumNet live connection needs macOS; elsewhere the **SkookumNet** button is simply not shown, and every other function remains available.
+
 ![Initial screen](images/en/A-1.png)
 
 ### Tested browsers
@@ -519,13 +521,13 @@ Receive and display SkookumLogger's QSOs in real time. The **SkookumNet bridge**
 
 ### Prerequisites
 
-- **macOS** — the bridge uses macOS Multipeer Connectivity, so it is macOS-only.
+- **macOS** — required for this feature alone, because the bridge uses macOS Multipeer Connectivity.
 - SkookumLogger must be running.
 - The SkookumNet bridge must be running (→ [Starting the bridge](#starting-the-bridge)).
 - The bridge must be on the same Layer-2 network as SkookumLogger. Running both on the same Mac is the simplest arrangement.
 - `uv` must be installed. If it is not, the launcher prints the install command.
 
-> **SkookumNet button:** The button is not shown on non-macOS systems. On macOS it is always shown; if the bridge is not running when you attempt to connect, a connection error will be reported. (The browser cannot check whether a local file exists, so the bridge's state cannot be known until a connection is attempted.)
+> **SkookumNet button:** The button is not shown on non-macOS systems. **Only the button is hidden — every other function, log file analysis included, remains available.** On macOS it is always shown; if the bridge is not running when you attempt to connect, a connection error will be reported. (The browser cannot check whether a local file exists, so the bridge's state cannot be known until a connection is attempted.)
 
 ### Starting the bridge {#starting-the-bridge}
 
