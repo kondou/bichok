@@ -1503,15 +1503,15 @@ everything at once:</p>
 <ol type="1">
 <li><code>uv</code> installs the dependencies (PyObjC and websockets)
 into a temporary environment — the first run takes a while.</li>
-<li>The bridge (<code>bridge/bichoc_bridge.py</code>) starts.</li>
+<li>The bridge (<code>bridge/bichok_bridge.py</code>) starts.</li>
 <li><code>contest_log_analyzer.html</code> opens in your browser.</li>
 </ol>
 <p>Closing the terminal window that opened also stops the bridge. The
-bridge writes its own log to <code>bridge/bichoc-bridge.log</code>.</p>
+bridge writes its own log to <code>bridge/bichok-bridge.log</code>.</p>
 <p>To start it from the command line instead:</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run <span class="at">--no-project</span> <span class="at">--python</span> 3.13 <span class="dt">\</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--with</span> pyobjc-framework-MultipeerConnectivity <span class="at">--with</span> websockets <span class="dt">\</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  python bridge/bichoc_bridge.py</span></code></pre></div>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  python bridge/bichok_bridge.py</span></code></pre></div>
 <p>The main options (any argument given to the launcher is passed
 straight through to the bridge):</p>
 <table>
@@ -1889,7 +1889,7 @@ no QSOs arrive</h3>
 advertises nothing.</li>
 <li>Did you press <strong>Reset</strong> once for a new log?</li>
 <li>Are the bridge and SkookumLogger on the same Layer-2 network?</li>
-<li>Check <code>bridge/bichoc-bridge.log</code> for details; starting
+<li>Check <code>bridge/bichok-bridge.log</code> for details; starting
 the bridge with <code>--debug</code> records every packet.</li>
 </ul>
 <h3 id="file-will-not-load">File will not load</h3>
@@ -1968,7 +1968,7 @@ both portrait and landscape orientations.</p>
 </blockquote>
 <hr />
 <h2 id="license">License</h2>
-<p>BicHok version 1.0.10<br />
+<p>BicHok version 1.0.11<br />
 Copyright © 2026 kondou<br />
 Released under the MIT License.</p>
 <pre><code>Permission is hereby granted, free of charge, to any person obtaining a copy

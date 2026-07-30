@@ -570,17 +570,17 @@ Receive and display SkookumLogger's QSOs in real time. The **SkookumNet bridge**
 Double-click `start_skookumnet.command`. This does everything at once:
 
 1. `uv` installs the dependencies (PyObjC and websockets) into a temporary environment — the first run takes a while.
-2. The bridge (`bridge/bichoc_bridge.py`) starts.
+2. The bridge (`bridge/bichok_bridge.py`) starts.
 3. `contest_log_analyzer.html` opens in your browser.
 
-Closing the terminal window that opened also stops the bridge. The bridge writes its own log to `bridge/bichoc-bridge.log`.
+Closing the terminal window that opened also stops the bridge. The bridge writes its own log to `bridge/bichok-bridge.log`.
 
 To start it from the command line instead:
 
 ```bash
 uv run --no-project --python 3.13 \
   --with pyobjc-framework-MultipeerConnectivity --with websockets \
-  python bridge/bichoc_bridge.py
+  python bridge/bichok_bridge.py
 ```
 
 The main options (any argument given to the launcher is passed straight through to the bridge):
@@ -777,7 +777,7 @@ Both the main chart and panes support zoom and pan.
 - Did you click **Join** in SkookumLogger's **SkookumNet** window? Until you do, SkookumLogger advertises nothing.
 - Did you press **Reset** once for a new log?
 - Are the bridge and SkookumLogger on the same Layer-2 network?
-- Check `bridge/bichoc-bridge.log` for details; starting the bridge with `--debug` records every packet.
+- Check `bridge/bichok-bridge.log` for details; starting the bridge with `--debug` records every packet.
 
 ### File will not load
 - Is the file in Cabrillo or ADIF format?
@@ -825,7 +825,7 @@ When the Pane View is active, a **▲ Hide** button appears at the bottom-left o
 
 ## License
 
-BicHok version 1.0.10  
+BicHok version 1.0.11  
 Copyright © 2026 kondou  
 Released under the MIT License.
 

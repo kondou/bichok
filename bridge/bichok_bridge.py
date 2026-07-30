@@ -22,7 +22,7 @@ from snet import protocol                                    # noqa: E402  pylin
 from snet.session import SkookumNetPeer                      # noqa: E402  pylint: disable=wrong-import-position
 from snet.webbridge import WebBridge, DEFAULT_HOST, DEFAULT_PORT  # noqa: E402  pylint: disable=wrong-import-position
 
-DEFAULT_LOG = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bichoc-bridge.log')
+DEFAULT_LOG = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bichok-bridge.log')
 
 # Deliberately not the machine's station name: SkookumLogger derives that from the host name, and
 # this bridge usually runs on the same Mac, so reusing it would collide with SkookumLogger itself.

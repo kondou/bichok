@@ -1432,15 +1432,15 @@ macOS
 <ol type="1">
 <li><code>uv</code> が依存パッケージ（PyObjC /
 websockets）を一時環境へ自動導入する（初回のみ時間がかかる）</li>
-<li>ブリッジ（<code>bridge/bichoc_bridge.py</code>）が起動する</li>
+<li>ブリッジ（<code>bridge/bichok_bridge.py</code>）が起動する</li>
 <li><code>contest_log_analyzer.html</code> がブラウザで開く</li>
 </ol>
 <p>起動したターミナルウィンドウを閉じるとブリッジも停止する。ブリッジの動作ログは
-<code>bridge/bichoc-bridge.log</code>。</p>
+<code>bridge/bichok-bridge.log</code>。</p>
 <p>コマンドラインから直接起動する場合:</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run <span class="at">--no-project</span> <span class="at">--python</span> 3.13 <span class="dt">\</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--with</span> pyobjc-framework-MultipeerConnectivity <span class="at">--with</span> websockets <span class="dt">\</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  python bridge/bichoc_bridge.py</span></code></pre></div>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  python bridge/bichok_bridge.py</span></code></pre></div>
 <p>主なオプション（ランチャーに渡した引数はそのままブリッジへ渡される）:</p>
 <table>
 <colgroup>
@@ -1804,7 +1804,7 @@ QSO が届かない</h3>
 は何も広告しない</li>
 <li>新しいログで一度 <strong>Reset</strong> ボタンを押したか</li>
 <li>ブリッジと SkookumLogger が同じ L2 ネットワーク上にあるか</li>
-<li>詳しい状況は <code>bridge/bichoc-bridge.log</code>
+<li>詳しい状況は <code>bridge/bichok-bridge.log</code>
 を確認（<code>--debug</code>
 を付けて起動すると全パケットが記録される）</li>
 </ul>
@@ -1876,7 +1876,7 @@ QSO」アンカーが合わせやすい場合がある</li>
 </blockquote>
 <hr />
 <h2 id="ライセンス">ライセンス</h2>
-<p>BicHok version 1.0.10<br />
+<p>BicHok version 1.0.11<br />
 Copyright © 2026 kondou<br />
 MIT License にて公開。</p>
 <pre><code>Permission is hereby granted, free of charge, to any person obtaining a copy

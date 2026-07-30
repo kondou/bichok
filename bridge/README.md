@@ -11,14 +11,14 @@ another station's log.
 
     uv run --python 3.14 \
       --with pyobjc-framework-MultipeerConnectivity --with websockets \
-      python bichoc_bridge.py
+      python bichok_bridge.py
 
 Then point the analyser page at `ws://localhost:2237`.
 
 `uv` is the easy route because the Python that ships with macOS is too old for current PyObjC
 wheels and tries to build them from source. Any Python 3.13 or newer with
 `pyobjc-framework-MultipeerConnectivity` and `websockets` installed will do just as well, in which
-case `python3 bichoc_bridge.py` is enough.
+case `python3 bichok_bridge.py` is enough.
 
     --name NAME             how the bridge appears in SkookumLogger (default: BicHok)
     --host HOST             address to serve the browser on (default: localhost)
@@ -95,7 +95,7 @@ SkookumNetAutomerge article. It shares no code with any other SkookumNet client.
 
 ## Layout
 
-    bichoc_bridge.py   start-up and command line
+    bichok_bridge.py   start-up and command line
     selftest.py        checks the merge rules against the published examples
     snet/protocol.py   tags, flag bits, packet framing
     snet/objects.py    the objects SkookumLogger puts on the wire

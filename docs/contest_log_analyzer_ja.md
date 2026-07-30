@@ -569,17 +569,17 @@ SkookumLogger の QSO 情報をリアルタイムで受信して表示。BicHok 
 `start_skookumnet.command` をダブルクリックする。以下がまとめて行われる。
 
 1. `uv` が依存パッケージ（PyObjC / websockets）を一時環境へ自動導入する（初回のみ時間がかかる）
-2. ブリッジ（`bridge/bichoc_bridge.py`）が起動する
+2. ブリッジ（`bridge/bichok_bridge.py`）が起動する
 3. `contest_log_analyzer.html` がブラウザで開く
 
-起動したターミナルウィンドウを閉じるとブリッジも停止する。ブリッジの動作ログは `bridge/bichoc-bridge.log`。
+起動したターミナルウィンドウを閉じるとブリッジも停止する。ブリッジの動作ログは `bridge/bichok-bridge.log`。
 
 コマンドラインから直接起動する場合:
 
 ```bash
 uv run --no-project --python 3.13 \
   --with pyobjc-framework-MultipeerConnectivity --with websockets \
-  python bridge/bichoc_bridge.py
+  python bridge/bichok_bridge.py
 ```
 
 主なオプション（ランチャーに渡した引数はそのままブリッジへ渡される）:
@@ -776,7 +776,7 @@ X 軸起点
 - SkookumLogger の **SkookumNet** ウィンドウで **Join** を実行したか。Join するまで SkookumLogger は何も広告しない
 - 新しいログで一度 **Reset** ボタンを押したか
 - ブリッジと SkookumLogger が同じ L2 ネットワーク上にあるか
-- 詳しい状況は `bridge/bichoc-bridge.log` を確認（`--debug` を付けて起動すると全パケットが記録される）
+- 詳しい状況は `bridge/bichok-bridge.log` を確認（`--debug` を付けて起動すると全パケットが記録される）
 
 ### ファイルが読み込めない
 - Cabrillo または ADIF 形式であるか
@@ -825,7 +825,7 @@ iPhone（Safari）等で利用可能。縦・横いずれの向きでも動作�
 
 ## ライセンス
 
-BicHok version 1.0.10  
+BicHok version 1.0.11  
 Copyright © 2026 kondou  
 MIT License にて公開。
 

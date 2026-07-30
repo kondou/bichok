@@ -10,14 +10,14 @@ if ! command -v uv &>/dev/null; then
   exit 1
 fi
 
-pkill -f "bichoc_bridge.py" 2>/dev/null
+pkill -f "bichok_bridge.py" 2>/dev/null
 sleep 0.3
 
 # 依存はここで直接指定するため、プロジェクトファイル等は不要です
 # (--no-project: 同じフォルダに無関係な pyproject.toml があっても影響を受けない)
 uv run --no-project --python 3.13 \
   --with pyobjc-framework-MultipeerConnectivity --with websockets \
-  python bridge/bichoc_bridge.py "$@" &
+  python bridge/bichok_bridge.py "$@" &
 CLIENT_PID=$!
 
 sleep 1.0
