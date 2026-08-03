@@ -112,6 +112,36 @@ def test_no_action_cases():
     check('and the clocks are merged instead', alpha.clocks[('A', 4)], {'A': 5, 'B': 2})
 
 
+def test_in_place_rewrite():
+    """The owner may rewrite a QSO without counting an event; the resend is its stored truth.
+
+    Field observation (ContestPan, 2026-08-04, three-way check of wire dump, mirror log and the
+    peer's sqlite): the country annotation lands in notes after the initial send, with no clock
+    advance and no immediate resend. The annotated copy arrives later as the answer to a lagging
+    clock, carrying the same per-QSO clock as the first send. Ignoring it freezes the mirror at
+    the un-annotated shape and the advertised log hashes disagree from then on.
+    """
+    print('in-place rewrite by the owner')
+    alpha = qsolog.QsoLog()
+    first = FakeQso('A', 4, vector_clock={'A': 4})
+    first.notes = ''
+    alpha.merge_qso(first)
+
+    annotated = FakeQso('A', 4, vector_clock={'A': 4})
+    annotated.notes = 'UA9 Asiatic Russia'
+    check('a same-clock resend with new content replaces our copy',
+          alpha.merge_qso(annotated), qsolog.UPDATED)
+    check('and the annotation is what we now hold',
+          alpha.qsos[('A', 4)].notes, 'UA9 Asiatic Russia')
+
+    check('resending the annotated copy again does nothing',
+          alpha.merge_qso(annotated), None)
+
+    stale = FakeQso('A', 4, vector_clock={'A': 3})
+    stale.notes = ''
+    check('an older arrival still cannot undo it', alpha.merge_qso(stale), None)
+
+
 def test_tombstones():
     """A deletion is a flag on the QSO, not the removal of one."""
     print('tombstones')
@@ -325,7 +355,7 @@ def test_silence_watchdog():
 def main():
     """Run every check and report."""
     for test in (test_clock_relationships, test_example_one, test_example_three,
-                 test_no_action_cases, test_tombstones, test_identity,
+                 test_no_action_cases, test_in_place_rewrite, test_tombstones, test_identity,
                  test_peer_information_roundtrip, test_log_hash, test_qso_hash,
                  test_silence_watchdog):
         test()

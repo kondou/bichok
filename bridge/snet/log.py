@@ -102,9 +102,18 @@ class QsoLog:
         ours = self.clocks.get(key, {})
         relation = vclock.compare(ours, theirs)
 
-        if relation in (vclock.IDENTICAL, vclock.DOMINATES):
-            # We already hold everything this copy carries.
+        if relation == vclock.DOMINATES:
+            # We hold a strictly newer version; this copy arrived late.
             return None
+
+        if relation == vclock.IDENTICAL:
+            if _fields_of(self.qsos[key]) == _fields_of(qso):
+                return None
+            # Same clock, different content: the owning station rewrote the QSO in place without
+            # counting an event -- annotations added to notes after the initial send do this --
+            # and what it resends is its stored truth. Keeping our copy would freeze the QSO at
+            # its first shape and the advertised log hashes would disagree from then on.
+            return self._replace(key, qso, theirs)
 
         if relation == vclock.DOMINATED:
             return self._replace(key, qso, theirs)
