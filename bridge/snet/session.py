@@ -15,10 +15,11 @@ Two rules govern the sync epoch and both matter:
 import logging
 import plistlib
 import pprint
+import time
 
 import objc
 from Foundation import NSObject, NSDate, NSNull, NSTimer, NSKeyedArchiver, NSKeyedUnarchiver, NSProcessInfo, NSString
-from MultipeerConnectivity import MCSessionSendDataReliable
+from MultipeerConnectivity import MCSession, MCEncryptionNone, MCSessionSendDataReliable
 from MultipeerConnectivity import MCSessionStateConnected, MCSessionStateNotConnected
 
 from . import clock as vclock
@@ -83,6 +84,7 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         self.hash_agreed = None
         self.binary_version = None
         self.sync_existing_log = False
+        self.last_received = None
         return self
 
     # --- outgoing ---
@@ -108,6 +110,7 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         other peers what we are missing, and they push it to us. It is the only reason a
         listen-only peer has to transmit at all.
         """
+        self._check_silence()
         info = PeerInformation.alloc().initWithStationName_(self.station)
         # The clock names every station we know of, not just the ones we hold events from. Our own
         # entry is required and never moves past zero, since we originate nothing. The others are
@@ -172,6 +175,47 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         else:
             logging.debug("Sent tag %s to %d peer(s) as %d elements, epoch %s",
                           tag, len(peers), len(packet), self.epoch)
+
+    @objc.python_method
+    def _check_silence(self):
+        """Rebuild the session when connected peers have gone silent.
+
+        A peer can vanish without a disconnect event ever arriving. PeerInformation comes every
+        five seconds while a session is alive, so a long silence from a connected peer means the
+        session is dead, not idle. The advertiser is unaffected, so a fresh session gets found and
+        invited again, and the log we kept means the gap arrives as a fill.
+        """
+        if not self.session.connectedPeers():
+            self.last_received = None
+            return
+        now = time.monotonic()
+        if self.last_received is None:
+            self.last_received = now
+            return
+        quiet = now - self.last_received
+        if quiet < protocol.SILENCE_TIMEOUT:
+            return
+        logging.warning("Nothing has arrived for %.0f seconds although %d peer(s) look connected; "
+                        "rebuilding the session so we can be invited again",
+                        quiet, len(self.session.connectedPeers()))
+        self._rebuild_session()
+
+    @objc.python_method
+    def _rebuild_session(self):
+        """Replace a dead session with a fresh one, telling the listener the old one is over.
+
+        The old session's delegate is detached first so its teardown cannot deliver stale
+        callbacks. Everything else -- log, epoch, dialect -- is kept: the peer and its log have
+        not changed, only the transport died under them.
+        """
+        old = self.session
+        old.setDelegate_(None)
+        old.disconnect()
+        self.session = MCSession.alloc().initWithPeer_securityIdentity_encryptionPreference_(
+            self.peerID, None, MCEncryptionNone)
+        self.session.setDelegate_(self)
+        self.last_received = None
+        self.listener.session_ended()
 
     @objc.python_method
     def _request_legacy_log(self):
@@ -256,6 +300,7 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
     def peerConnected_(self, info):
         """Note the new peer, but say nothing until it has shown us which protocol it speaks."""
         logging.info("%s joined; waiting to hear which protocol it speaks before transmitting", info['peer'])
+        self.last_received = time.monotonic()
         if self.sync_existing_log and len(self.session.connectedPeers()) > 1:
             logging.warning("More than one peer is on the network. Other operators will see this "
                             "bridge listed with their own version string in its tooltip; start with "
@@ -269,6 +314,7 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
 
     def receive_(self, info):
         """Decode one packet and act on it."""
+        self.last_received = time.monotonic()  # any bytes at all mean the session is alive
         packet, error = NSKeyedUnarchiver.unarchivedObjectOfClasses_fromData_error_(
             self.classes, info['data'], None)
         if error is not None:

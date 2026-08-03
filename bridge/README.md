@@ -86,6 +86,14 @@ in its SkookumNet window, and that is needed once per log. The bridge never inve
 adopts whichever it observes and echoes that back. A packet stamped with an older epoch is stale
 and ignored; a newer one means somebody reset, so the bridge clears its log and starts again.
 
+## When the session goes quiet
+
+A session can lose its peer without a disconnect event ever arriving. PeerInformation comes every
+five seconds while a session is alive, so once thirty seconds pass with a peer connected and
+nothing received, the bridge concludes the session is dead and replaces it. Advertising never
+stopped, so SkookumLogger invites the new session on its own; the log is kept across the swap,
+and whatever was missed in the gap arrives as a fill.
+
 ## Licence
 
 MIT — see LICENSE. Copyright (c) 2026 Katsuhiro Kondou, JH5GHM (JE6RPM).

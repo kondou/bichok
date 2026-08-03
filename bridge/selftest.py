@@ -256,11 +256,78 @@ def test_qso_hash():
     check('the hash fits in 64 bits', qso('W3KX').qso_hash() < 2 ** 64, True)
 
 
+def test_silence_watchdog():
+    """A connected but silent session is rebuilt; a live or empty one is left alone.
+
+    The dead-session shape comes from ContestPan's field observation: the peer is recreated on
+    the other side, no disconnect event ever arrives, and reception just stops. PeerInformation
+    is due every five seconds, so a long silence with peers connected can only mean the session
+    is dead.
+    """
+    print('silence watchdog')
+    import time  # pylint: disable=import-outside-toplevel
+    from MultipeerConnectivity import MCPeerID, MCSession  # pylint: disable=import-outside-toplevel
+    from snet.session import SkookumNetPeer  # pylint: disable=import-outside-toplevel
+
+    class FakeSession:
+        """Stands in for MCSession, remembering whether it was torn down."""
+        def __init__(self, peers):
+            self.peers = peers
+            self.disconnected = False
+        def connectedPeers(self):
+            return self.peers
+        def setDelegate_(self, _delegate):
+            pass
+        def disconnect(self):
+            self.disconnected = True
+
+    class FakeListener:
+        """Records the one callback the rebuild makes."""
+        def __init__(self):
+            self.ended = False
+        def session_ended(self):
+            self.ended = True
+
+    peer_id = MCPeerID.alloc().initWithDisplayName_('BicHok')
+
+    def build(peers):
+        listener = FakeListener()
+        session = FakeSession(peers)
+        made = SkookumNetPeer.alloc().initWithSession_peerID_listener_(session, peer_id, listener)
+        return made, session, listener
+
+    peer, session, _ = build([])
+    peer.last_received = time.monotonic() - 999
+    peer._check_silence()  # pylint: disable=protected-access
+    check('no peers means no rebuild', peer.session is session, True)
+    check('and the baseline is dropped', peer.last_received, None)
+
+    peer, session, _ = build(['fake'])
+    peer.last_received = time.monotonic()
+    peer._check_silence()  # pylint: disable=protected-access
+    check('a live session is left alone', peer.session is session, True)
+
+    peer, session, _ = build(['fake'])
+    peer.last_received = None
+    peer._check_silence()  # pylint: disable=protected-access
+    check('a connected peer with no baseline starts one', peer.last_received is not None, True)
+    check('without rebuilding', peer.session is session, True)
+
+    peer, session, listener = build(['fake'])
+    peer.last_received = time.monotonic() - (protocol.SILENCE_TIMEOUT + 1)
+    peer._check_silence()  # pylint: disable=protected-access
+    check('a silent session is torn down', session.disconnected, True)
+    check('and replaced with a real one', isinstance(peer.session, MCSession), True)
+    check('the listener hears the session end', listener.ended, True)
+    check('the baseline resets for the next session', peer.last_received, None)
+
+
 def main():
     """Run every check and report."""
     for test in (test_clock_relationships, test_example_one, test_example_three,
                  test_no_action_cases, test_tombstones, test_identity,
-                 test_peer_information_roundtrip, test_log_hash, test_qso_hash):
+                 test_peer_information_roundtrip, test_log_hash, test_qso_hash,
+                 test_silence_watchdog):
         test()
 
     print()

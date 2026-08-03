@@ -105,7 +105,8 @@ def main():
     finally:
         peer.stop()
         advertiser.stopAdvertisingPeer()
-        session.disconnect()
+        # Through peer, not the local variable: the silence watchdog may have replaced the session.
+        peer.session.disconnect()
         bridge.stop()
         logging.info("Left SkookumNet")
 

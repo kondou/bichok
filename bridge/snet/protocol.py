@@ -18,6 +18,12 @@ LEGACY_SERVICE_TYPE = 'skookum-network'
 # SkookumLogger broadcasts its PeerInformation on this interval, and so do we.
 PEER_INFORMATION_INTERVAL = 5.0
 
+# A session can lose its peer without a disconnect event ever arriving (seen after the peer was
+# torn down and recreated on the other side). PeerInformation comes every five seconds while a
+# session is alive, so this much silence from a connected peer is not something a live session
+# produces -- at that point the session is dead and gets rebuilt.
+SILENCE_TIMEOUT = 30.0
+
 # --- SkookumLogger 5.x tags. Packet is [tag, payload]. ---
 LEGACY_GAB = 0
 LEGACY_PEER_INFORMATION = 1
