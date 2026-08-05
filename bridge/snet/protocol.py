@@ -21,8 +21,25 @@ PEER_INFORMATION_INTERVAL = 5.0
 # A session can lose its peer without a disconnect event ever arriving (seen after the peer was
 # torn down and recreated on the other side). PeerInformation comes every five seconds while a
 # session is alive, so this much silence from a connected peer is not something a live session
-# produces -- at that point the session is dead and gets rebuilt.
+# produces -- at that point the session is dead and gets rebuilt. One caveat, observed by
+# ContestPan: SkookumLogger stops advertising and sending while a modal dialog is open, so a
+# long dialog trips this too. That costs nothing but a rebuild and a fresh fill.
 SILENCE_TIMEOUT = 30.0
+
+# Advertising can stall at the OS level: a browser that has been running for a long time on the
+# other side stops seeing advertisements that a freshly started dns-sd sees fine (ContestPan
+# reproduced the stall three times, the longest lasting thirteen hours). A brand-new advertisement
+# is seen as a new discovery even by a stalled browser, so when nobody has connected for this long
+# the advertiser is torn down and recreated. Recovery after re-advertising took anywhere from five
+# seconds to three and a half minutes in the field, which is why this repeats instead of firing
+# once.
+READVERTISE_TIMEOUT = 60.0
+
+# How soon after one announcement the next may follow. Announcements are sent in reply to the
+# advertisements of others, so two passive peers with no log owner in sight would otherwise answer
+# each other forever, each reply prompting the next. The floor breaks that loop and nothing else:
+# the peers whose replies matter advertise on PEER_INFORMATION_INTERVAL, well above it.
+ANNOUNCE_FLOOR = 1.0
 
 # --- SkookumLogger 5.x tags. Packet is [tag, payload]. ---
 LEGACY_GAB = 0

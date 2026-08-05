@@ -83,8 +83,24 @@ order.
 
 An epoch marks a generation of the log. Only SkookumLogger creates one, through the reset button
 in its SkookumNet window, and that is needed once per log. The bridge never invents an epoch: it
-adopts whichever it observes and echoes that back. A packet stamped with an older epoch is stale
-and ignored; a newer one means somebody reset, so the bridge clears its log and starts again.
+adopts what it observes and echoes that back.
+
+Whose observation counts is the fine print. The epoch follows the log's *owner* — the peer that
+sends sync packets, which only a logger ever does, QSOs aboard or not — and follows it in both
+directions, because replacing the log file on the owner rolls its epoch back. A peer that keeps echoing the newest epoch it ever saw reads to
+SkookumLogger as a request to reset the log, and confirming that dialog erases the log for real.
+Until an owner is known, newer epochs are adopted from anyone — a freshly reset SkookumLogger has
+no QSOs to send yet, so insisting on an owner there would wait forever. Once one is known, other
+peers' epochs are echoes of the past and are ignored. If the owner stops advertising an epoch
+altogether — a brand-new log has no reset in its history — the bridge drops its own epoch and its
+QSOs and starts over with it. Packets whose epoch was not accepted by these rules are dropped.
+
+For the same reason the bridge announces itself as a *reply* to the owner's advertisement rather
+than on a timer of its own: each announcement then leaves moments after taking in the owner's
+current state, so a stale epoch of ours is on the wire for milliseconds rather than a five-second
+window. While no owner is known every peer's advertisement is answered, since announcing our clock
+is what makes somebody send a fill. SkookumLogger advertises every five seconds, so the effective
+rate is unchanged.
 
 ## When the session goes quiet
 
@@ -92,7 +108,17 @@ A session can lose its peer without a disconnect event ever arriving. PeerInform
 five seconds while a session is alive, so once thirty seconds pass with a peer connected and
 nothing received, the bridge concludes the session is dead and replaces it. Advertising never
 stopped, so SkookumLogger invites the new session on its own; the log is kept across the swap,
-and whatever was missed in the gap arrives as a fill.
+and whatever was missed in the gap arrives as a fill. (One thing to know: SkookumLogger goes
+silent while a modal dialog is open, so a long-lived dialog trips this too. That costs nothing
+but the rebuild and a fresh fill.)
+
+## When nobody connects
+
+Discovery itself can stall: a browser that has been running for a long time on the other side can
+stop seeing advertisements that a freshly started one sees fine, and no amount of waiting fixes
+it. A brand-new advertisement is seen as a new discovery even by a stalled browser, so when a
+minute passes with nobody connected the bridge withdraws its advertisement and advertises afresh,
+and repeats that for as long as it stays alone — the invitation can take minutes to arrive.
 
 ## Licence
 

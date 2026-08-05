@@ -352,12 +352,267 @@ def test_silence_watchdog():
     check('the baseline resets for the next session', peer.last_received, None)
 
 
+def build_peer(connected):
+    """Return a SkookumNetPeer wired to recording stand-ins, plus those stand-ins.
+
+    The session records what gets sent instead of sending it, and the listener counts the
+    callbacks the epoch rules make. Nothing touches the network.
+    """
+    from MultipeerConnectivity import MCPeerID  # pylint: disable=import-outside-toplevel
+    from snet.session import SkookumNetPeer  # pylint: disable=import-outside-toplevel
+
+    class RecordingSession:
+        """Stands in for MCSession, remembering what was sent through it."""
+        def __init__(self, peers):
+            self.peers = list(peers)
+            self.sent = []
+        def connectedPeers(self):
+            return self.peers
+        def setDelegate_(self, _delegate):
+            pass
+        def disconnect(self):
+            pass
+        def sendData_toPeers_withMode_error_(self, data, peers, mode, error):  # pylint: disable=unused-argument
+            self.sent.append(data)
+            return (True, None)
+
+    class RecordingListener:
+        """Counts the callbacks the session makes."""
+        def __init__(self):
+            self.cleared = 0
+        def log_cleared(self):
+            self.cleared += 1
+        def session_started(self, contest):
+            pass
+        def session_ended(self):
+            pass
+        def peer_information(self, info):
+            pass
+        def qso_added(self, qso):
+            pass
+        def qso_updated(self, qso):
+            pass
+        def qso_deleted(self, qso):
+            pass
+        def qso_conflicted(self, qso):
+            pass
+
+    listener = RecordingListener()
+    session = RecordingSession(connected)
+    peer_id = MCPeerID.alloc().initWithDisplayName_('BicHok')
+    peer = SkookumNetPeer.alloc().initWithSession_peerID_listener_(session, peer_id, listener)
+    return peer, session, listener
+
+
+def test_owner_epoch_rules():
+    """The epoch follows the log's owner, in both directions; others only ever move it forward.
+
+    Field observation (ContestPan, 2026-08-05): replacing the log file on SkookumLogger rolls its
+    epoch back, and a passive peer that keeps naming the newest epoch it ever saw reads to
+    SkookumLogger as a request to reset the log -- confirming that dialog erases the log for real.
+    """
+    print('owner epoch rules')
+    from Foundation import NSDate  # pylint: disable=import-outside-toplevel
+
+    e1 = NSDate.dateWithTimeIntervalSince1970_(1000.0)
+    e2 = NSDate.dateWithTimeIntervalSince1970_(2000.0)
+    e3 = NSDate.dateWithTimeIntervalSince1970_(3000.0)
+    peer, _, listener = build_peer(['fake'])
+
+    check('with no epoch and no owner, anyone is adopted',
+          peer._epoch_allows(e1, 'CP'), True)  # pylint: disable=protected-access
+    check('and the epoch is theirs', peer.epoch is e1, True)
+    check('with no owner, a newer epoch is adopted from anyone',
+          peer._epoch_allows(e2, 'CP'), True)  # pylint: disable=protected-access
+    check('but an older one is stale',
+          peer._epoch_allows(e1, 'CP'), False)  # pylint: disable=protected-access
+    check('and does not move the epoch', peer.epoch is e2, True)
+
+    peer._learn_owner('SL')  # pylint: disable=protected-access
+    peer.log.qsos[('K1AB', 1)] = FakeQso('K1AB', 1)
+    cleared = listener.cleared
+    check('the owner rolls the epoch back',
+          peer._epoch_allows(e1, 'SL'), True)  # pylint: disable=protected-access
+    check('to its value', peer.epoch is e1, True)
+    check('and the log of the replaced generation is dropped', len(peer.log.qsos), 0)
+    check('the listener saw it dropped', listener.cleared, cleared + 1)
+
+    check('a newer epoch from a non-owner is an echo and is dropped',
+          peer._epoch_allows(e3, 'CP'), False)  # pylint: disable=protected-access
+    check('and adopts nothing', peer.epoch is e1, True)
+    check('the same epoch passes from anyone',
+          peer._epoch_allows(e1, 'CP'), True)  # pylint: disable=protected-access
+
+    peer.epoch = None
+    check('with no epoch but a known owner, a non-owner is refused',
+          peer._epoch_allows(e3, 'CP'), False)  # pylint: disable=protected-access
+    check('and we still hold none', peer.epoch is None, True)
+    check('while the owner is followed',
+          peer._epoch_allows(e3, 'SL'), True)  # pylint: disable=protected-access
+    check('to its epoch', peer.epoch is e3, True)
+
+
+def test_owner_identification():
+    """A sync packet of any content marks its sender as the owner; only a logger sends one.
+
+    Counting the empty ones is deliberate and agreed with ContestPan: a freshly reset
+    SkookumLogger sends QSO-less SyncQso packets, and those let it establish itself as owner
+    before it has a single QSO to send.
+    """
+    print('owner identification')
+    from snet.objects import PeerInformation  # pylint: disable=import-outside-toplevel
+
+    peer, _, _ = build_peer(['fake'])
+    qso = FakeQso('K1AB', 1)
+
+    check('a sync dictionary with QSOs marks the owner',
+          peer._marks_owner(protocol.SYNC_QSO, {'qsos': [qso], 'vc': {}}), True)  # pylint: disable=protected-access
+    check('so does a clock-only one',
+          peer._marks_owner(protocol.SYNC_QSO, {'vc': {'SL': 5}}), True)  # pylint: disable=protected-access
+    check('and an empty one',
+          peer._marks_owner(protocol.SYNC_QSO, {}), True)  # pylint: disable=protected-access
+    check('a PeerInformation does not, passive peers send those too',
+          peer._marks_owner(protocol.PEER_INFORMATION,  # pylint: disable=protected-access
+                            PeerInformation.alloc().initWithStationName_('CP')), False)
+    check('a 5.x delete list marks the owner',
+          peer._marks_owner(protocol.LEGACY_DELETE_QSOS, [qso]), True)  # pylint: disable=protected-access
+    check('a list under any other tag does not',
+          peer._marks_owner(protocol.LEGACY_GAB, [qso]), False)  # pylint: disable=protected-access
+
+    peer._learn_owner('SL')  # pylint: disable=protected-access
+    check('the owner is remembered', peer.owner, 'SL')
+
+
+def test_owner_going_epochless():
+    """When the owner stops advertising an epoch, ours goes too, and so does the old log.
+
+    Field observation (ContestPan): a brand-new log has no reset in its history, so its
+    SkookumLogger advertises no epoch at all -- and cannot treat a peer that still names one as a
+    sync partner. Only the payload's own syncEpoch says this; the NSNull in the packet frame is
+    the normal shape of "not set".
+    """
+    print('the owner going epoch-less')
+    from Foundation import NSDate  # pylint: disable=import-outside-toplevel
+    from snet.objects import PeerInformation  # pylint: disable=import-outside-toplevel
+
+    def advertisement(name):
+        info = PeerInformation.alloc().initWithStationName_(name)
+        info.hashOfQSOs = None
+        return info
+
+    epoch = NSDate.dateWithTimeIntervalSince1970_(1000.0)
+    peer, _, listener = build_peer(['fake'])
+    peer.owner = 'SL'
+    peer.epoch = epoch
+    peer.log.qsos[('K1AB', 1)] = FakeQso('K1AB', 1)
+
+    peer._handle_peer_information(advertisement('CP'), 'CP')  # pylint: disable=protected-access
+    check('a non-owner without an epoch changes nothing', peer.epoch is epoch, True)
+    check('and the log is kept', len(peer.log.qsos), 1)
+
+    cleared = listener.cleared
+    peer._handle_peer_information(advertisement('SL'), 'SL')  # pylint: disable=protected-access
+    check('the owner without an epoch clears ours', peer.epoch is None, True)
+    check('and the old log with it', len(peer.log.qsos), 0)
+    check('and the listener heard', listener.cleared, cleared + 1)
+
+
+def test_reply_announce():
+    """Announcements travel as replies: always to the owner, to anyone while no owner is known,
+    never to another passive peer once one is -- and never twice within the floor."""
+    print('announcements as replies')
+    from snet.objects import PeerInformation  # pylint: disable=import-outside-toplevel
+
+    def advertisement(name):
+        info = PeerInformation.alloc().initWithStationName_(name)
+        info.hashOfQSOs = None
+        return info
+
+    peer, session, _ = build_peer(['fake'])
+    peer.dialect = 'sync2'
+
+    peer._handle_peer_information(advertisement('CP'), 'CP')  # pylint: disable=protected-access
+    check('with no owner known, anyone is answered', len(session.sent), 1)
+
+    peer._handle_peer_information(advertisement('CP'), 'CP')  # pylint: disable=protected-access
+    check('but not twice within the floor', len(session.sent), 1)
+
+    peer.owner = 'SL'
+    peer.last_announce = None
+    peer._handle_peer_information(advertisement('CP'), 'CP')  # pylint: disable=protected-access
+    check('once the owner is known, a passive peer is not answered', len(session.sent), 1)
+
+    peer._handle_peer_information(advertisement('SL'), 'SL')  # pylint: disable=protected-access
+    check('while the owner always is', len(session.sent), 2)
+
+
+def test_readvertise():
+    """A long wait with nobody connected replaces the advertisement, and keeps replacing it."""
+    print('re-advertising when alone')
+    import time  # pylint: disable=import-outside-toplevel
+
+    class FakeAdvertiser:
+        """Stands in for MCNearbyServiceAdvertiser."""
+        def __init__(self):
+            self.advertising = False
+        def startAdvertisingPeer(self):
+            self.advertising = True
+        def stopAdvertisingPeer(self):
+            self.advertising = False
+
+    peer, session, _ = build_peer([])
+    peer.service_type = 'skookumnetwork'
+    peer._make_advertiser = FakeAdvertiser  # pylint: disable=protected-access
+    first = FakeAdvertiser()
+    first.advertising = True
+    peer.advertiser = first
+
+    peer._check_alone()  # pylint: disable=protected-access
+    check('the first lonely look starts the clock', peer.alone_since is not None, True)
+    check('without replacing anything', peer.advertiser is first, True)
+
+    peer.alone_since = time.monotonic() - (protocol.READVERTISE_TIMEOUT + 1)
+    peer._check_alone()  # pylint: disable=protected-access
+    check('the timeout replaces the advertiser', peer.advertiser is not first, True)
+    check('the old one was withdrawn', first.advertising, False)
+    check('the new one is advertising', peer.advertiser.advertising, True)
+    check('and the clock restarts for the next round', peer.alone_since is not None, True)
+
+    second = peer.advertiser
+    peer.alone_since = time.monotonic() - (protocol.READVERTISE_TIMEOUT + 1)
+    peer._check_alone()  # pylint: disable=protected-access
+    check('it repeats for as long as nobody connects', peer.advertiser is not second, True)
+
+    third = peer.advertiser
+    session.peers = ['fake']
+    peer.alone_since = time.monotonic() - (protocol.READVERTISE_TIMEOUT + 1)
+    peer._check_alone()  # pylint: disable=protected-access
+    check('a connected peer stops the clock', peer.alone_since is None, True)
+    check('and the advertiser stays', peer.advertiser is third, True)
+
+
+def test_duplicate_fill():
+    """The same fill arriving twice changes nothing the second time.
+
+    Field observation (ContestPan): identical fills can arrive 0.2 to 9 seconds apart.
+    """
+    print('duplicate fills')
+    log = qsolog.QsoLog()
+    check('the first copy lands',
+          log.merge_qso(FakeQso('K1AB', 1, vector_clock={'K1AB': 1})), qsolog.ADDED)
+    check('the second is silently ignored',
+          log.merge_qso(FakeQso('K1AB', 1, vector_clock={'K1AB': 1})), None)
+    check('and the log holds one QSO', len(log.qsos), 1)
+
+
 def main():
     """Run every check and report."""
     for test in (test_clock_relationships, test_example_one, test_example_three,
                  test_no_action_cases, test_in_place_rewrite, test_tombstones, test_identity,
                  test_peer_information_roundtrip, test_log_hash, test_qso_hash,
-                 test_silence_watchdog):
+                 test_silence_watchdog, test_owner_epoch_rules, test_owner_identification,
+                 test_owner_going_epochless, test_reply_announce, test_readvertise,
+                 test_duplicate_fill):
         test()
 
     print()

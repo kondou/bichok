@@ -4,13 +4,27 @@ This peer only listens. It advertises itself so SkookumLogger can invite it, bro
 PeerInformation so it takes part in the sync properly, and never sends anything that could change
 another station's log.
 
-Two rules govern the sync epoch and both matter:
+Three rules govern the sync epoch and all of them matter:
 
   * An epoch is never invented here. Only SkookumLogger's Reset button creates one. This peer
     adopts whichever epoch it observes and echoes that back.
-  * A packet stamped with an epoch older than the current one is stale and gets dropped. A packet
-    with no epoch at all is only good for its PeerInformation. PeerInformation is always read
+  * The epoch follows the log's owner -- the peer that sends sync packets, which only a logger
+    ever does. The owner's word
+    is followed in both directions, older as well as newer, because replacing the log file on
+    the owner rolls its epoch *back*; a passive peer that keeps naming the newest epoch it ever
+    saw reads to SkookumLogger as a request to reset the log, and confirming that dialog erases
+    the log for real. Until an owner is known, newer epochs are adopted from anyone (a freshly
+    reset SkookumLogger has no QSOs to send, so insisting on an owner there would deadlock);
+    once one is known, other peers' epochs are just echoes of the past and never a trigger.
+  * A packet stamped with an epoch that was not accepted by the above is dropped. A packet with
+    no epoch at all is only good for its PeerInformation. PeerInformation is always read
     regardless, because it is what carries the epoch that every other decision depends on.
+
+Announcements are replies, not a heartbeat. Answering the owner's advertisement right after
+taking in its current epoch shrinks the window in which a stale epoch of ours is on the wire
+from five seconds to milliseconds -- and it was exactly that window that produced the reset
+dialog above. While no owner is known, every peer's advertisement is answered, since without
+announcing our clock nobody sends us a fill.
 """
 import logging
 import plistlib
@@ -21,6 +35,7 @@ import objc
 from Foundation import NSObject, NSDate, NSNull, NSTimer, NSKeyedArchiver, NSKeyedUnarchiver, NSProcessInfo, NSString
 from MultipeerConnectivity import MCSession, MCEncryptionNone, MCSessionSendDataReliable
 from MultipeerConnectivity import MCSessionStateConnected, MCSessionStateNotConnected
+from MultipeerConnectivity import MCNearbyServiceAdvertiser
 
 from . import clock as vclock
 from . import log as qsolog
@@ -85,23 +100,83 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         self.binary_version = None
         self.sync_existing_log = False
         self.last_received = None
+        self.owner = None
+        self.advertiser = None
+        self.service_type = None
+        self.alone_since = None
+        self.last_announce = None
         return self
 
     # --- outgoing ---
 
     @objc.python_method
     def start(self):
-        """Begin broadcasting our own PeerInformation on the usual interval."""
+        """Begin the housekeeping tick that watches over the session and the advertiser."""
         if self.timer is None:
             self.timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-                protocol.PEER_INFORMATION_INTERVAL, self, 'announce:', None, True)
+                protocol.PEER_INFORMATION_INTERVAL, self, 'tick:', None, True)
 
     @objc.python_method
     def stop(self):
-        """Stop broadcasting."""
+        """Stop the housekeeping tick."""
         if self.timer is not None:
             self.timer.invalidate()
             self.timer = None
+
+    def tick_(self, _timer):
+        """Watch for the two ways of being stuck: a dead session, and an advertisement unseen."""
+        self._check_silence()
+        self._check_alone()
+
+    @objc.python_method
+    def start_advertising(self, service_type):
+        """Advertise ourselves so SkookumLogger can find us and invite us."""
+        self.service_type = service_type
+        self.advertiser = self._make_advertiser()
+        self.advertiser.startAdvertisingPeer()
+
+    @objc.python_method
+    def stop_advertising(self):
+        """Withdraw the advertisement."""
+        if self.advertiser is not None:
+            self.advertiser.stopAdvertisingPeer()
+            self.advertiser = None
+
+    @objc.python_method
+    def _make_advertiser(self):
+        """Create a fresh advertiser for our peer, delegated to us."""
+        advertiser = MCNearbyServiceAdvertiser.alloc().initWithPeer_discoveryInfo_serviceType_(
+            self.peerID, None, self.service_type)
+        advertiser.setDelegate_(self)
+        return advertiser
+
+    @objc.python_method
+    def _check_alone(self):
+        """Advertise afresh when nobody has connected for a while.
+
+        A browser that has been running for a long time on the other side can stop seeing
+        advertisements that a freshly started one sees fine -- the subscription stalls somewhere
+        in the OS, and no amount of patience fixes it. A brand-new advertisement is seen as a new
+        discovery even by a stalled browser, so recreating the advertiser is the whole cure, and
+        it repeats for as long as nobody connects because the invitation can take minutes to come.
+        """
+        if self.advertiser is None:
+            return
+        if self.session.connectedPeers():
+            self.alone_since = None
+            return
+        now = time.monotonic()
+        if self.alone_since is None:
+            self.alone_since = now
+            return
+        if now - self.alone_since < protocol.READVERTISE_TIMEOUT:
+            return
+        logging.warning("Nobody has connected for %.0f seconds; advertising afresh in case "
+                        "the old advertisement has gone unseen", now - self.alone_since)
+        self.advertiser.stopAdvertisingPeer()
+        self.advertiser = self._make_advertiser()
+        self.advertiser.startAdvertisingPeer()
+        self.alone_since = now
 
     def announce_(self, _timer):
         """Broadcast what we have seen.
@@ -110,7 +185,6 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         other peers what we are missing, and they push it to us. It is the only reason a
         listen-only peer has to transmit at all.
         """
-        self._check_silence()
         info = PeerInformation.alloc().initWithStationName_(self.station)
         # The clock names every station we know of, not just the ones we hold events from. Our own
         # entry is required and never moves past zero, since we originate nothing. The others are
@@ -334,12 +408,45 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
             logging.error("Ignoring a packet from %s with no payload", info['peer'])
             return
 
+        # A peer that sends sync packets is the log's owner -- the one whose epoch is to be
+        # followed. Learned before the epoch check so that the very packet that identifies the
+        # owner is already judged by the owner's rules.
+        if self._marks_owner(tag, payload):
+            self._learn_owner(info['peer'])
+
         # PeerInformation is exempt from the epoch check: it is what carries the epoch, so
         # dropping it would leave us permanently unable to learn the one we are missing.
         if not isinstance(payload, PeerInformation) and not self._epoch_allows(epoch, info['peer']):
             return
 
         self._dispatch(tag, payload, info['peer'])
+
+    @objc.python_method
+    def _marks_owner(self, tag, payload):
+        """Say whether this packet identifies its sender as the log's owner.
+
+        Any sync dictionary counts, QSOs or not: only a logger ever sends SyncQso, so the packet
+        kind alone says what its sender is. Counting the empty ones matters -- a freshly reset
+        SkookumLogger really does send QSO-less SyncQso packets (ContestPan measured a burst of
+        them right after an Initialize), and those let it establish itself as owner before it has
+        a single QSO to its name. (Agreed with ContestPan, 2026-08-05, after first requiring QSOs
+        here.)
+        """
+        if isinstance(payload, TransientQso):
+            return True
+        if isinstance(payload, dict) or hasattr(payload, 'objectForKey_'):
+            return True
+        if isinstance(payload, (list, tuple)) or hasattr(payload, 'objectAtIndex_'):
+            return tag in (protocol.LEGACY_DELETE_QSOS, protocol.LEGACY_ALL_QSOS_RESPONSE,
+                           protocol.LEGACY_REPLACE_LOG)
+        return False
+
+    @objc.python_method
+    def _learn_owner(self, peer):
+        """Remember which peer the log belongs to."""
+        if self.owner != peer:
+            logging.info("The log belongs to %s; its epoch is the one to follow", peer)
+            self.owner = peer
 
     @objc.python_method
     def _dump_archive(self, data, peer, packet):
@@ -414,35 +521,50 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
             self.asked_for_legacy_log = True
             self.announce_(None)
             self._request_legacy_log()
-        elif dialect == 'sync2':
-            self.announce_(None)
+        # A SkookumNet-2 peer is not announced to here: it hears from us when its
+        # PeerInformation arrives, which is all but always the first packet anyway -- see
+        # _reply for why announcements only ever travel as replies.
 
     @objc.python_method
     def _epoch_allows(self, epoch, peer):
-        """Decide whether a packet's epoch lets us act on it, resetting the log if it is newer."""
+        """Decide whether a packet's epoch lets us act on it, adopting it when its source may
+        change ours.
+
+        The owner's epoch is followed in both directions -- replacing the log file on the owner
+        rolls its epoch back, and refusing to roll back with it is what turns into the reset
+        dialog on SkookumLogger's side. Anyone's newer epoch is followed only while no owner is
+        known; once one is, other peers' epochs are echoes of the past and get dropped.
+        """
         if epoch is None:
             # Either a 5.x peer, which has no epoch at all, or a 6.x peer whose log has not been
             # initialised yet. Nothing to check against.
             return True
-        if self.epoch is None:
-            self._adopt_epoch(epoch, peer)
+        if self.epoch is not None and self.epoch.compare_(epoch) == 0:
             return True
 
-        order = self.epoch.compare_(epoch)
-        if order == 0:
-            return True
-        if order > 0:
+        if self.owner is None:
+            if self.epoch is None or self.epoch.compare_(epoch) < 0:
+                self._adopt_epoch(epoch, peer)
+                return True
             logging.debug("Dropping a stale packet from %s", peer)
             return False
 
-        self._adopt_epoch(epoch, peer)
-        return True
+        if peer == self.owner:
+            self._adopt_epoch(epoch, peer)
+            return True
+
+        logging.debug("Ignoring the epoch %s named by %s: the log belongs to %s", epoch, peer, self.owner)
+        return False
 
     @objc.python_method
     def _adopt_epoch(self, epoch, peer):
-        """Take on a new epoch and start over, which is what a reset on any peer means."""
+        """Take on another epoch and start over: the log we held belongs to a different generation.
+
+        Newer means somebody reset; older means the owner's log file was replaced by one with an
+        earlier reset in its history. Both change which log this is, so both start it afresh.
+        """
         if self.epoch is not None:
-            logging.info("%s reset the log; starting over at epoch %s", peer, epoch)
+            logging.info("%s moved the log to epoch %s (we were at %s); starting over", peer, epoch, self.epoch)
         else:
             logging.info("Adopting the epoch %s advertised by %s", epoch, peer)
         self.epoch = epoch
@@ -478,6 +600,18 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
 
         if info.syncEpoch is not None:
             self._epoch_allows(info.syncEpoch, peer)
+        elif peer == self.owner and self.epoch is not None:
+            # The owner now advertises no epoch at all: its log was replaced by a brand-new one
+            # with no reset in its history. Following it down matters twice over -- the QSOs we
+            # hold belong to the log that went away, and a SkookumLogger without an epoch cannot
+            # treat a peer that names one as a sync partner. Only the payload's own field says
+            # this; the NSNull in the packet frame is the normal shape of "not set" and says
+            # nothing. (An epoch-less SkookumLogger still leaves every peer "not synced" until
+            # its Initialize button issues a fresh epoch -- that part only the operator can do.)
+            logging.info("%s no longer advertises an epoch; clearing ours and starting over", peer)
+            self.epoch = None
+            self.log.clear()
+            self.listener.log_cleared()
 
         # Deliberately not folded into our own clock. A peer's broadcast says what *it* has, and
         # claiming those events as ours would tell it we are up to date -- so it would send us
@@ -505,6 +639,27 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
                           peer, theirs, self.log.node_clock)
 
         self.listener.peer_information(info)
+        self._reply(peer)
+
+    @objc.python_method
+    def _reply(self, peer):
+        """Answer an advertisement with our own, when this peer's advertisements deserve one.
+
+        Announcing here rather than on a timer means every announcement of ours goes out moments
+        after taking in the owner's current state, so a stale epoch of ours is on the wire for
+        milliseconds instead of a five-second window. The owner is always answered; while no owner
+        is known, everyone is (announcing our clock is what makes somebody send us a fill). A
+        passive peer's advertisement is never answered once an owner is known -- that one reply
+        would be the hole a stale epoch escapes through. The floor breaks the loop of two
+        ownerless passive peers answering each other's answers forever.
+        """
+        if self.owner is not None and peer != self.owner:
+            return
+        now = time.monotonic()
+        if self.last_announce is not None and now - self.last_announce < protocol.ANNOUNCE_FLOOR:
+            return
+        self.last_announce = now
+        self.announce_(None)
 
     @objc.python_method
     def _handle_sync(self, payload, peer):

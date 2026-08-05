@@ -14,7 +14,7 @@ import os
 import sys
 
 from PyObjCTools import AppHelper
-from MultipeerConnectivity import MCSession, MCPeerID, MCNearbyServiceAdvertiser, MCEncryptionNone
+from MultipeerConnectivity import MCSession, MCPeerID, MCEncryptionNone
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 
@@ -94,18 +94,17 @@ def main():
                         "in SkookumLogger's peer table and a 5.x peer will not be asked for its log")
     session.setDelegate_(peer)
 
-    advertiser = MCNearbyServiceAdvertiser.alloc().initWithPeer_discoveryInfo_serviceType_(
-        peerID, None, arguments.service)
-    advertiser.setDelegate_(peer)
-    advertiser.startAdvertisingPeer()
+    # The peer owns its advertiser: when nobody connects for long enough it replaces the
+    # advertisement, which is the cure for a discovery that has stalled on the other side.
+    peer.start_advertising(arguments.service)
     peer.start()
 
     try:
         AppHelper.runConsoleEventLoop(installInterrupt=True)
     finally:
         peer.stop()
-        advertiser.stopAdvertisingPeer()
-        # Through peer, not the local variable: the silence watchdog may have replaced the session.
+        peer.stop_advertising()
+        # Through peer, not a local variable: the silence watchdog may have replaced the session.
         peer.session.disconnect()
         bridge.stop()
         logging.info("Left SkookumNet")
