@@ -9,7 +9,7 @@ versions, and a peer whose Run/S&P display goes blank is a far better outcome th
 away a packet full of QSOs because a single field changed shape.
 """
 import objc
-from Foundation import NSObject, NSSet, NSArray, NSString, NSNumber, NSDate, NSUUID, NSDictionary
+from Foundation import NSObject, NSSet, NSArray, NSString, NSNumber, NSDate, NSUUID, NSDictionary, NSNull
 
 NSSecureCoding = objc.protocolNamed('NSSecureCoding')
 
@@ -355,8 +355,11 @@ def allowed_classes():
     inside a sync dictionary are covered by naming them here.
     """
     from MultipeerConnectivity import MCPeerID  # pylint: disable=import-outside-toplevel
+    # NSNull is what an epoch-less peer puts in the epoch slot, and the unarchiver rejects the
+    # whole packet over one unlisted class -- without it, nothing a freshly reset SkookumLogger
+    # sends would decode. ContestPan hit exactly that from the other side and pointed it out here.
     return NSSet.setWithArray_([
-        NSArray, NSDictionary, NSString, NSNumber, NSDate, NSUUID,
+        NSArray, NSDictionary, NSString, NSNumber, NSDate, NSUUID, NSNull,
         Exchange, TransientQso, Activity, PeerInformation, PeerContestInfo,
         MCPeerID,
     ])

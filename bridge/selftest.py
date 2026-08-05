@@ -430,9 +430,13 @@ def test_owner_epoch_rules():
 
     peer._learn_owner('SL')  # pylint: disable=protected-access
     peer.log.qsos[('K1AB', 1)] = FakeQso('K1AB', 1)
+    check('an old stamp on the owner\'s data packet is a straggler and is dropped',
+          peer._epoch_allows(e1, 'SL'), False)  # pylint: disable=protected-access
+    check('without moving the epoch', peer.epoch is e2, True)
+    check('or touching the log', len(peer.log.qsos), 1)
     cleared = listener.cleared
-    check('the owner rolls the epoch back',
-          peer._epoch_allows(e1, 'SL'), True)  # pylint: disable=protected-access
+    check('the owner\'s advertisement rolls the epoch back',
+          peer._epoch_allows(e1, 'SL', advertised=True), True)  # pylint: disable=protected-access
     check('to its value', peer.epoch is e1, True)
     check('and the log of the replaced generation is dropped', len(peer.log.qsos), 0)
     check('the listener saw it dropped', listener.cleared, cleared + 1)
@@ -605,6 +609,31 @@ def test_duplicate_fill():
     check('and the log holds one QSO', len(log.qsos), 1)
 
 
+def test_null_epoch_packet():
+    """A packet with NSNull in the epoch slot survives the secure unarchiver.
+
+    NSNull is what an epoch-less peer -- a freshly reset SkookumLogger -- puts there, and one
+    unlisted class makes the unarchiver reject the whole packet. ContestPan hit this from its
+    own side first (2026-07-29), and its crosscheck of spec 2.2 caught the class missing from
+    this client's allowed set too.
+    """
+    print('the NSNull epoch slot')
+    from Foundation import NSNull, NSKeyedArchiver, NSKeyedUnarchiver  # pylint: disable=import-outside-toplevel
+    from snet.objects import allowed_classes  # pylint: disable=import-outside-toplevel
+
+    packet = [protocol.SYNC_QSO, NSNull.null(), {'vc': {'SL': 1}}]
+    data, error = NSKeyedArchiver.archivedDataWithRootObject_requiringSecureCoding_error_(
+        packet, True, None)
+    check('the packet archives', error is None, True)
+    decoded, error = NSKeyedUnarchiver.unarchivedObjectOfClasses_fromData_error_(
+        allowed_classes(), data, None)
+    check('and decodes with the allowed classes', error is None, True)
+    tag, epoch, payload = protocol.split_packet(decoded)
+    check('the tag survives', tag, protocol.SYNC_QSO)
+    check('the NSNull reads as no epoch', epoch is None, True)
+    check('and the clock is intact', vclock.to_dict(payload['vc']) if payload else None, {'SL': 1})
+
+
 def main():
     """Run every check and report."""
     for test in (test_clock_relationships, test_example_one, test_example_three,
@@ -612,7 +641,7 @@ def main():
                  test_peer_information_roundtrip, test_log_hash, test_qso_hash,
                  test_silence_watchdog, test_owner_epoch_rules, test_owner_identification,
                  test_owner_going_epochless, test_reply_announce, test_readvertise,
-                 test_duplicate_fill):
+                 test_duplicate_fill, test_null_epoch_packet):
         test()
 
     print()

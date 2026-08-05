@@ -10,7 +10,8 @@ Three rules govern the sync epoch and all of them matter:
     adopts whichever epoch it observes and echoes that back.
   * The epoch follows the log's owner -- the peer that sends sync packets, which only a logger
     ever does. The owner's word
-    is followed in both directions, older as well as newer, because replacing the log file on
+    is followed in both directions, older as well as newer (backward only from its
+    PeerInformation, which cannot be a straggler -- see _epoch_allows), because replacing the log file on
     the owner rolls its epoch *back*; a passive peer that keeps naming the newest epoch it ever
     saw reads to SkookumLogger as a request to reset the log, and confirming that dialog erases
     the log for real. Until an owner is known, newer epochs are adopted from anyone (a freshly
@@ -526,14 +527,18 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         # _reply for why announcements only ever travel as replies.
 
     @objc.python_method
-    def _epoch_allows(self, epoch, peer):
+    def _epoch_allows(self, epoch, peer, advertised=False):
         """Decide whether a packet's epoch lets us act on it, adopting it when its source may
-        change ours.
+        change ours. `advertised` says the epoch came from a PeerInformation payload.
 
         The owner's epoch is followed in both directions -- replacing the log file on the owner
         rolls its epoch back, and refusing to roll back with it is what turns into the reset
-        dialog on SkookumLogger's side. Anyone's newer epoch is followed only while no owner is
-        known; once one is, other peers' epochs are echoes of the past and get dropped.
+        dialog on SkookumLogger's side. The *backward* direction is followed only from the
+        owner's PeerInformation, though: an advertisement carries its sender's present, while a
+        data packet stamped with an old epoch can equally be a straggler from before the move,
+        and rolling back on one of those would clear the log for nothing (the owner's next
+        advertisement would move it right back). Anyone's newer epoch is followed only while no
+        owner is known; once one is, other peers' epochs are echoes of the past and get dropped.
         """
         if epoch is None:
             # Either a 5.x peer, which has no epoch at all, or a 6.x peer whose log has not been
@@ -550,8 +555,11 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
             return False
 
         if peer == self.owner:
-            self._adopt_epoch(epoch, peer)
-            return True
+            if self.epoch is None or self.epoch.compare_(epoch) < 0 or advertised:
+                self._adopt_epoch(epoch, peer)
+                return True
+            logging.debug("Dropping a straggler from before %s moved the log", peer)
+            return False
 
         logging.debug("Ignoring the epoch %s named by %s: the log belongs to %s", epoch, peer, self.owner)
         return False
@@ -599,7 +607,7 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
             self.last_peer_info[peer] = str(info)
 
         if info.syncEpoch is not None:
-            self._epoch_allows(info.syncEpoch, peer)
+            self._epoch_allows(info.syncEpoch, peer, advertised=True)
         elif peer == self.owner and self.epoch is not None:
             # The owner now advertises no epoch at all: its log was replaced by a brand-new one
             # with no reset in its history. Following it down matters twice over -- the QSOs we
