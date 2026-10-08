@@ -1,5 +1,5 @@
 <!--
-  BicHok — Contest Log Analyzer  v1.0.16
+  BicHok — Contest Log Analyzer  v1.0.17
   Copyright (c) 2026 kondou
   Released under the MIT License.
 
@@ -673,7 +673,7 @@ body.compact #compact-btn { opacity: 1; color: var(--accent); border-color: var(
 
 <script>
 
-const APP_VERSION = '1.0.16';
+const APP_VERSION = '1.0.17';
 document.title = 'BicHok ver.' + APP_VERSION;
 
 // グリッドロケーター -> 緯度経度
@@ -1175,6 +1175,7 @@ const I18N = {
     wsDisconnected: '切断しました',
     wsReconnecting: '再接続中...',
     wsError: '接続エラー',
+    wsRejected: 'ブリッジが接続を拒否（ページとブリッジのフォルダが別）',
     wsSessionEnd: 'セッション終了',
     wsFileView: '接続中（手動ファイル表示中）',
     noContest: 'Contest Log Analyzer',
@@ -1283,6 +1284,7 @@ const I18N = {
     wsDisconnected: 'Disconnected',
     wsReconnecting: 'Reconnecting...',
     wsError: 'Connection error',
+    wsRejected: 'Refused by the bridge (page and bridge are in different folders)',
     wsSessionEnd: 'Session ended',
     wsFileView: 'Connected (file view)',
     noContest: 'Contest Log Analyzer',
@@ -1780,7 +1782,11 @@ const _ADD_EMA_COLOR   = '#ff6d00';
 const _ADD_LOESS_COLOR = '#b39ddb';
 const _ADD_ACCEL_COLOR = '#40c4ff';
 
+// innerHTML へ差し込む外部由来の文字列（ログのコールサイン・コンテスト名、SkookumNetの局名）を無害化する
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
 // 複数ログ比較時に各ログを区別するための最短ラベルを返す（ツールチップ用）
+// textContent でも使うため戻り値はエスケープしない。innerHTML に入れる側で esc() を通すこと
 function _logDistinctLabel(log) {
   if (!log) return '';
   if (log.isLive && !log.isGroup) return 'SKNet';
@@ -1876,7 +1882,7 @@ function _openFullChartLogMenu(anchorEl) {
     const item = document.createElement('div');
     item.style.cssText = 'padding:4px 10px;cursor:pointer;display:flex;align-items:center;gap:6px;';
     const checked = _fullChartLogIds && _fullChartLogIds.has(log.id);
-    item.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${log.color};"></span>${_logDistinctLabel(log)}`;
+    item.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${log.color};"></span>${esc(_logDistinctLabel(log))}`;
     if (checked) item.style.color = 'var(--accent)';
     item.onmouseenter = () => item.style.background = 'rgba(255,255,255,0.06)';
     item.onmouseleave = () => item.style.background = '';
@@ -3034,7 +3040,7 @@ function renderOpLegend(segments, multiSegs) {
     const parts = multiSegs.map(entry => {
       const { ms, str } = _offHHMM(entry.segments);
       if (!ms) return null;
-      return entry.label ? `${entry.label} ${str}` : str;
+      return entry.label ? `${esc(entry.label)} ${str}` : str;
     }).filter(Boolean);
     offTimeLabel = parts.length ? `Off Time: ${parts.join(' / ')}` : 'Off Time (00:00)';
     // 単独表示時もseen判定のためにチェック
@@ -3505,7 +3511,7 @@ function renderCharts(qsos) {
             // 参照ログ (datasets 0-4)
             const refLog_ = _refLog();
             if (!refLog_ || refLog_.visible) {
-              const pfx = _multiLogMode ? `[${refLog_ ? _logDistinctLabel(refLog_) : ''}] ` : '';
+              const pfx = _multiLogMode ? `[${refLog_ ? esc(_logDistinctLabel(refLog_)) : ''}] ` : '';
               const refC = (refLog_ && refLog_.color) || '#E24B4A';
               const nc = bsearch(ds[0] ? ds[0].data : null);
               const nr = bsearch(ds[1] ? ds[1].data : null);
@@ -3524,7 +3530,7 @@ function renderCharts(qsos) {
                 seen.add(d2._logId);
                 const log_ = _logStore.find(l => l.id === d2._logId);
                 if (!log_ || !log_.visible) continue;
-                const lbl = _logDistinctLabel(log_);
+                const lbl = esc(_logDistinctLabel(log_));
                 const oc = _logOverlayColors(log_);
                 const rc = _logRateColor(log_);
                 const sibs = ds.filter(sd => sd._logId === d2._logId && sd._isAdditional && sd !== d2);
@@ -3823,7 +3829,7 @@ function renderCharts(qsos) {
     const timeStr = fmtUtc(slot.ms) + '〜' + fmtUtc(slot.ms + currentSlotWidthMs);
     const totalQso  = slot.stacks.reduce((s, x) => s + x.qso,  0);
     const totalRate = slot.stacks.reduce((s, x) => s + x.rate, 0);
-    const lbl    = (_multiLogMode && log) ? `[${_logDistinctLabel(log)}] ` : '';
+    const lbl    = (_multiLogMode && log) ? `[${esc(_logDistinctLabel(log))}] ` : '';
     const isDark = logIdx > 0;
     const rows = [...slot.stacks].reverse().map(({band, qso, rate}) => {
       const bc = isDark ? _darkenHexColor(BAND_COLORS[band]||BAND_COLORS.other) : (BAND_COLORS[band]||BAND_COLORS.other);
@@ -4254,7 +4260,8 @@ async function loadText(text, appendMode) {
       initSimMode(currentQsos);
     }
   } catch(e) {
-    alert((currentLang === 'ja' ? '描画エラー: ' : 'Render error: ') + e.message + '\n' + e.stack.split('\n').slice(0,4).join('\n'));
+    console.error(e);
+    alert((currentLang === 'ja' ? '描画エラー: ' : 'Render error: ') + e.message);
   }
 }
 
@@ -5333,16 +5340,47 @@ function _wsClearReconnectTimer() {
   if (_wsAutoReconnectTimer) { clearTimeout(_wsAutoReconnectTimer); _wsAutoReconnectTimer = null; }
 }
 
-function _wsOpenSocket(url) {
-  wsSocket = new WebSocket(url);
+// ブリッジが起動のたびにこのページと同じフォルダへ書き出すトークンを読む（無ければ null）。
+// ブリッジはこれを提示しない接続を拒否する: 他のWebサイトは ws://localhost には届くがこのファイルは読めない。
+// ブリッジの再起動でトークンが変わるので、接続のたびに読み直す
+function _wsReadToken() {
+  return new Promise(resolve => {
+    window.__BICHOK_TOKEN = undefined;
+    const s = document.createElement('script');
+    const done = () => { s.remove(); resolve(window.__BICHOK_TOKEN || null); };
+    s.onload = done;
+    s.onerror = done;
+    s.src = 'bridge_token.js?' + Date.now();
+    document.head.appendChild(s);
+  });
+}
+
+let _wsOpenSeq = 0;
+async function _wsOpenSocket(url) {
+  const seq = ++_wsOpenSeq;
+  let target = url;
+  try {
+    const u = new URL(url);
+    // トークンはこのマシンのブリッジにだけ渡す
+    if (['localhost', '127.0.0.1', '[::1]'].includes(u.hostname)) {
+      const token = await _wsReadToken();
+      if (seq !== _wsOpenSeq || _wsConnectUrl !== url) return;  // 読んでいる間に切断・再接続された
+      if (token) { u.searchParams.set('t', token); target = u.toString(); }
+    }
+  } catch (_) {}
+  wsSocket = new WebSocket(target);
   wsSocket.onopen = () => {
     wsSetStatus('connecting', i18n('wsWaiting'));
   };
-  wsSocket.onclose = () => {
+  wsSocket.onclose = e => {
     const wasLive = wsLiveMode;
     wsLiveMode = false;
     wsSocket = null;
-    if (wasLive && _wsConnectUrl) {
+    if (e.code === 1008) {
+      // トークン不一致でブリッジに拒否された。再試行しても通らないので自動再接続はしない
+      _wsConnectUrl = null;
+      wsSetStatus('error', i18n('wsRejected'));
+    } else if (wasLive && _wsConnectUrl) {
       // ライブセッション中の予期しない切断 → 自動再接続
       wsSetStatus('connecting', i18n('wsReconnecting'));
       _wsAutoReconnectTimer = setTimeout(_wsDoReconnect, 5000);
@@ -5467,7 +5505,7 @@ function wsHandleMessage(msg) {
       _logStore.filter(l => l.isLive).forEach(l => { l.qsos = []; });
       wsUpdateCount();
       if (cumulChart) { cumulChart.destroy(); cumulChart = null; }
-      if (bandChart)  { bandChart.destroy();  bandChart  = null; }
+      if (rateChart)  { rateChart.destroy();  rateChart  = null; }
       document.getElementById('empty-msg').style.display = '';
       _renderLogPanel();
       break;
@@ -6871,7 +6909,7 @@ function _createLivePane(winMs) {
     // primaryIsLive時: primaryデータはSkookumNet → "SKNet"ラベル
     const _pIsLive = ld.primaryIsLive;
     const refPfx = isMulti
-      ? (_pIsLive ? '[SKNet] ' : `[${refLog ? _logDistinctLabel(refLog) : ''}] `)
+      ? (_pIsLive ? '[SKNet] ' : `[${refLog ? esc(_logDistinctLabel(refLog)) : ''}] `)
       : '';
     // primary (ref/live) log colors
     const _ptipCumulC = _pIsLive
@@ -6898,7 +6936,7 @@ function _createLivePane(winMs) {
     if (isMulti) {
       for (const ex of extraLD) {
         const log = _logStore.find(l => l.id === ex.logId);
-        const lbl = log ? _logDistinctLabel(log) : (ex.label || ex.logId);
+        const lbl = esc(log ? _logDistinctLabel(log) : (ex.label || ex.logId));
         if (log && !log.visible) continue;
         const rc = ex.rateColor || ex.color;
         const exEmaC   = ex.emaColor   || _ADD_EMA_COLOR;
@@ -6996,7 +7034,7 @@ function _createLivePane(winMs) {
     const d1 = new Date(slotStart), d2 = new Date(slotStart + bucketMs);
     const fmt2 = dt => String(dt.getUTCHours()).padStart(2,'0') + ':' + String(dt.getUTCMinutes()).padStart(2,'0');
     const timeStr = fmt2(d1) + i18n('toSep') + fmt2(d2);
-    const lbl = (isMulti && logForDisplay) ? `[${_logDistinctLabel(logForDisplay)}] ` : '';
+    const lbl = (isMulti && logForDisplay) ? `[${esc(_logDistinctLabel(logForDisplay))}] ` : '';
 
     let totalRate = 0;
     const bandParts = Object.entries(bandRatesForLog)

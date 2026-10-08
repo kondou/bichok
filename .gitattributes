@@ -1,0 +1,5 @@
+# Kept in the repository, left out of anything built with git archive
+/docs export-ignore
+/icons export-ignore
+/tools export-ignore
+/.gitattributes export-ignore

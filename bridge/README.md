@@ -15,6 +15,12 @@ another station's log.
 
 Then point the analyser page at `ws://localhost:2237`.
 
+The bridge serves only a browser that presents its token. Each start writes a fresh one to
+`bridge_token.js` in the folder above this one, where the analyser page sits; the page loads it
+from there and connects to `ws://localhost:2237/?t=TOKEN`. A web site open in the same browser can
+reach the port but cannot read that file, so it is turned away. Keep the page and the `bridge`
+folder together for this to work.
+
 `uv` is the easy route because the Python that ships with macOS is too old for current PyObjC
 wheels and tries to build them from source. Any Python 3.13 or newer with
 `pyobjc-framework-MultipeerConnectivity` and `websockets` installed will do just as well, in which

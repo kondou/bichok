@@ -8,9 +8,13 @@ state replayed to it. Nothing is ever asked of SkookumLogger to rebuild that sta
 has no request for it, and a peer joining is sent everything anyway.
 """
 import asyncio
+import hmac
 import json
 import logging
+import os
+import secrets
 import threading
+import urllib.parse
 
 try:
     import websockets
@@ -19,6 +23,8 @@ except ImportError:
 
 DEFAULT_HOST = 'localhost'
 DEFAULT_PORT = 2237
+
+TOKEN_FILE = 'bridge_token.js'
 
 _BANDS = (
     (1800, 2000, '160'), (3500, 4000, '80'), (5250, 5450, '60'), (7000, 7300, '40'),
@@ -82,12 +88,38 @@ def qso_as_dict(qso):
     }
 
 
+def issue_token(folder):
+    """Mint the token a browser has to present, and leave it beside the analyser page.
+
+    Any web site the operator happens to have open can reach a port on localhost, and a page
+    opened from a file sends no origin worth checking. What such a site cannot do is read a file
+    out of this folder. The analyser page can, so it picks the token up from here each time it
+    connects and hands it back. A fresh one is written on every start.
+    """
+    token = secrets.token_urlsafe(32)
+    path = os.path.join(folder, TOKEN_FILE)
+    scratch = path + '.tmp'
+    with open(scratch, 'w', encoding='utf-8') as handle:
+        os.chmod(scratch, 0o600)  # the operator's browser reads it; nobody else on the machine should
+        handle.write(f'window.__BICHOK_TOKEN = {json.dumps(token)};\n')
+    os.replace(scratch, path)
+    return token
+
+
+def token_in(path):
+    """Pull the token out of the path a browser asked for, as in /?t=TOKEN."""
+    values = urllib.parse.parse_qs(urllib.parse.urlsplit(path or '').query).get('t')
+    return values[0] if values else ''
+
+
 class WebBridge:
     """Serves the log to browsers, and receives the SkookumNet callbacks that keep it current."""
 
-    def __init__(self, host=DEFAULT_HOST, port=DEFAULT_PORT):
+    def __init__(self, host=DEFAULT_HOST, port=DEFAULT_PORT, token=None):
         self.host = host
         self.port = port
+        self.token = token
+        self.refused = 0
         self.contest = ''
         self.clients = set()
         self.cache = {}
@@ -174,8 +206,22 @@ class WebBridge:
                 gone.add(client)
         self.clients -= gone
 
+    def admits(self, path):
+        """Whether whoever asked for this path presented our token. With none set, anyone may connect."""
+        if self.token is None:
+            return True
+        return hmac.compare_digest(token_in(path).encode(), self.token.encode())
+
     async def _handle_client(self, websocket, path=None):
         """Greet a browser, replay what we have, then hold the connection open."""
+        # Newer releases of websockets keep what was asked for on the connection; older ones pass it in.
+        request = getattr(websocket, 'request', None)
+        if not self.admits(getattr(request, 'path', None) or path or getattr(websocket, 'path', '')):
+            self.refused += 1
+            logging.log(logging.WARNING if self.refused == 1 else logging.DEBUG,
+                        "Refused a browser that did not present the token (%d so far)", self.refused)
+            await websocket.close(1008, 'token required')
+            return
         self.clients.add(websocket)
         logging.info("A browser connected; %d now attached", len(self.clients))
         try:

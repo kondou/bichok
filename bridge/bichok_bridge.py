@@ -20,9 +20,12 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 
 from snet import protocol                                    # noqa: E402  pylint: disable=wrong-import-position
 from snet.session import SkookumNetPeer                      # noqa: E402  pylint: disable=wrong-import-position
-from snet.webbridge import WebBridge, DEFAULT_HOST, DEFAULT_PORT  # noqa: E402  pylint: disable=wrong-import-position
+from snet.webbridge import WebBridge, DEFAULT_HOST, DEFAULT_PORT, issue_token  # noqa: E402  pylint: disable=wrong-import-position
 
 DEFAULT_LOG = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bichok-bridge.log')
+
+# Where the analyser page lives: the folder above this one. The browser token is left there.
+PAGE_FOLDER = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 # Deliberately not the machine's station name: SkookumLogger derives that from the host name, and
 # this bridge usually runs on the same Mac, so reusing it would collide with SkookumLogger itself.
@@ -76,7 +79,7 @@ def main():
     name = arguments.name
     logging.info("Joining SkookumNet as %s, advertising _%s._tcp", name, arguments.service)
 
-    bridge = WebBridge(arguments.host, arguments.port)
+    bridge = WebBridge(arguments.host, arguments.port, issue_token(PAGE_FOLDER))
     bridge.start()
 
     peerID = MCPeerID.alloc().initWithDisplayName_(name)

@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from snet import clock as vclock                      # noqa: E402  pylint: disable=wrong-import-position
 from snet import protocol                             # noqa: E402  pylint: disable=wrong-import-position
 from snet import log as qsolog                        # noqa: E402  pylint: disable=wrong-import-position
+from snet import webbridge                            # noqa: E402  pylint: disable=wrong-import-position
 
 FAILURES = []
 
@@ -634,6 +635,30 @@ def test_null_epoch_packet():
     check('and the clock is intact', vclock.to_dict(payload['vc']) if payload else None, {'SL': 1})
 
 
+def test_browser_token():
+    """A browser is served only when it presents the token left beside the page."""
+    import tempfile  # pylint: disable=import-outside-toplevel
+    print('Browser token')
+    check('the token is read from the query', webbridge.token_in('/?t=abc'), 'abc')
+    check('a bare path carries none', webbridge.token_in('/'), '')
+    check('nor does a missing path', webbridge.token_in(None), '')
+
+    with tempfile.TemporaryDirectory() as folder:
+        token = webbridge.issue_token(folder)
+        with open(os.path.join(folder, webbridge.TOKEN_FILE), encoding='utf-8') as handle:
+            written = handle.read()
+        check('the token is left where the page can load it',
+              written, f'window.__BICHOK_TOKEN = "{token}";\n')
+        check('and each start mints a new one', webbridge.issue_token(folder) != token, True)
+
+    bridge = webbridge.WebBridge(token=token)
+    check('the right token is admitted', bridge.admits(f'/?t={token}'), True)
+    check('a wrong one is refused', bridge.admits('/?t=' + 'x' * len(token)), False)
+    check('none at all is refused', bridge.admits('/'), False)
+    check('an empty one is refused', bridge.admits('/?t='), False)
+    check('a bridge given no token admits anyone', webbridge.WebBridge().admits('/'), True)
+
+
 def main():
     """Run every check and report."""
     for test in (test_clock_relationships, test_example_one, test_example_three,
@@ -641,7 +666,7 @@ def main():
                  test_peer_information_roundtrip, test_log_hash, test_qso_hash,
                  test_silence_watchdog, test_owner_epoch_rules, test_owner_identification,
                  test_owner_going_epochless, test_reply_announce, test_readvertise,
-                 test_duplicate_fill, test_null_epoch_packet):
+                 test_duplicate_fill, test_null_epoch_packet, test_browser_token):
         test()
 
     print()
