@@ -1,5 +1,5 @@
 <!--
-  BicHok — Contest Log Analyzer  v1.0.17
+  BicHok — Contest Log Analyzer  v1.0.18
   Copyright (c) 2026 kondou
   Released under the MIT License.
 
@@ -673,7 +673,7 @@ body.compact #compact-btn { opacity: 1; color: var(--accent); border-color: var(
 
 <script>
 
-const APP_VERSION = '1.0.17';
+const APP_VERSION = '1.0.18';
 document.title = 'BicHok ver.' + APP_VERSION;
 
 // グリッドロケーター -> 緯度経度
@@ -7255,7 +7255,7 @@ document.getElementById('pane-add-btn').addEventListener('click', () => {
 
 // ファイルロード時の処理：追加モードではライブ接続を維持、置換モードのみ切断する
 const _wsOrigLoadText = loadText;
-loadText = function(text) {
+loadText = function(text, appendMode) {
   // ライブエントリが存在するか、ソケットが接続中の場合は切断しない
   // 置換モードが選択された場合は loadText 内の置換ブランチで切断する
   const _hasLiveEntry  = !!_logStore.find(l => l.isLive && !l.isGroup);
@@ -7267,7 +7267,7 @@ loadText = function(text) {
     if (_liveRafId) { cancelAnimationFrame(_liveRafId); _liveRafId = null; }
     for (const pane of [..._livePanes]) _destroyLivePane(pane.id);
   }
-  _wsOrigLoadText(text);
+  return _wsOrigLoadText(text, appendMode);
 };
 
 // ---- ファイル再読み込みボタン ----
