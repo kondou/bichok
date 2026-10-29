@@ -1,39 +1,43 @@
 """Wire-level constants and packet framing for SkookumNet.
 
-Two protocol generations share the network. SkookumLogger 5.x frames a packet as [tag, payload];
-SkookumNet-2 (SkookumLogger 6.x) adds the sender's sync epoch, giving [tag, epoch, payload].
-
-Tag numbers 5 and 6 changed meaning between the generations -- 5 went from AddQso to
-PartnerPrompt, 6 from ChangeQso to SyncQso -- so a tag number on its own cannot say which
-generation sent it, and reading a QSO as a string is a very confident way to be wrong. Everything
-here therefore identifies a packet by the *class* of its payload and treats the tag as a hint.
+SkookumLogger 6.1(16) and later carry SkookumNet over plain TCP: each station advertises a
+listener over Bonjour, and every pair of stations keeps one connection between them, divided into
+frames. The transport module deals with all of that. What travels inside a data frame is one
+packet: an NSKeyedArchiver archive of [tag, epoch, payload], where the epoch is NSNull while the
+sender has none.
 """
+import plistlib
+
 from Foundation import NSDate, NSNumber, NSNull
 
-# Bonjour service type. SkookumLogger 6.0 advertises this, measured with dns-sd; note that the
-# SkookumLogger 5.1 sources say "skookum-network" instead, which nothing on the wire answers to.
-SERVICE_TYPE = 'skookumnetwork'
-LEGACY_SERVICE_TYPE = 'skookum-network'
+# Bonjour service type. The service name is the station name; the TXT record carries the station
+# name again under 'name' and a UUID made afresh on every join under 'uuid'.
+SERVICE_TYPE = '_skookumnet._tcp'
+TXT_UUID = 'uuid'
+TXT_NAME = 'name'
 
-# SkookumLogger broadcasts its PeerInformation on this interval, and so do we.
+# Frames: a 4-byte big-endian length that counts the kind byte and the payload, the kind, and the
+# payload. A length of 0 or above the limit closes the connection.
+FRAME_HELLO = 0
+FRAME_DATA = 1
+FRAME_LIMIT = 64 * 1024 * 1024
+HELLO_VERSION = 1
+
+MAX_PEERS = 8
+RECONNECT_DELAY = 2.0     # after a connection ends, before the station that opens connections tries again
+FALLBACK_DELAY = 10.0     # how long the station that waits gives the other one to connect first
+HELLO_TIMEOUT = 10.0      # a connection that has not said hello by then is closed
+DUPLICATE_LINGER = 2.0    # how long the losing one of two connections to a peer stays open
+
+# TCP options SkookumLogger sets. With them a peer that vanishes without closing its connection
+# is noticed after about sixteen seconds.
+KEEPALIVE_IDLE = 10
+KEEPALIVE_INTERVAL = 2
+KEEPALIVE_COUNT = 3
+CONNECTION_DROP_TIME = 30  # seconds before unacknowledged data gives the connection up
+
+# SkookumLogger broadcasts its PeerInformation on this interval.
 PEER_INFORMATION_INTERVAL = 5.0
-
-# A session can lose its peer without a disconnect event ever arriving (seen after the peer was
-# torn down and recreated on the other side). PeerInformation comes every five seconds while a
-# session is alive, so this much silence from a connected peer is not something a live session
-# produces -- at that point the session is dead and gets rebuilt. One caveat, observed by
-# ContestPan: SkookumLogger stops advertising and sending while a modal dialog is open, so a
-# long dialog trips this too. That costs nothing but a rebuild and a fresh fill.
-SILENCE_TIMEOUT = 30.0
-
-# Advertising can stall at the OS level: a browser that has been running for a long time on the
-# other side stops seeing advertisements that a freshly started dns-sd sees fine (ContestPan
-# reproduced the stall three times, the longest lasting thirteen hours). A brand-new advertisement
-# is seen as a new discovery even by a stalled browser, so when nobody has connected for this long
-# the advertiser is torn down and recreated. Recovery after re-advertising took anywhere from five
-# seconds to three and a half minutes in the field, which is why this repeats instead of firing
-# once.
-READVERTISE_TIMEOUT = 60.0
 
 # How soon after one announcement the next may follow. Announcements are sent in reply to the
 # advertisements of others, so two passive peers with no log owner in sight would otherwise answer
@@ -41,21 +45,8 @@ READVERTISE_TIMEOUT = 60.0
 # the peers whose replies matter advertise on PEER_INFORMATION_INTERVAL, well above it.
 ANNOUNCE_FLOOR = 1.0
 
-# --- SkookumLogger 5.x tags. Packet is [tag, payload]. ---
-LEGACY_GAB = 0
-LEGACY_PEER_INFORMATION = 1
-LEGACY_ADD_ACTIVITY = 2
-LEGACY_CHANGE_ACTIVITY = 3
-LEGACY_DELETE_ACTIVITY = 4
-LEGACY_ADD_QSO = 5
-LEGACY_CHANGE_QSO = 6
-LEGACY_DELETE_QSOS = 7
-LEGACY_PARTNER_PROMPT = 8
-LEGACY_REQUEST_ALL_QSOS = 9
-LEGACY_ALL_QSOS_RESPONSE = 10
-LEGACY_REPLACE_LOG = 11
-
-# --- SkookumNet-2 tags. Packet is [tag, epoch, payload]. ---
+# Packet tags. They are consecutive values of an enum on SkookumLogger's side; SerialNumber is
+# pinned at 7 by the serial-server protocol.
 GAB = 0
 PEER_INFORMATION = 1
 ADD_ACTIVITY = 2
@@ -63,15 +54,17 @@ CHANGE_ACTIVITY = 3
 DELETE_ACTIVITY = 4
 PARTNER_PROMPT = 5
 SYNC_QSO = 6
+SERIAL_NUMBER = 7
 
-# Keys of the SkookumNet-2 sync dictionary. Any of them may be absent.
+# Keys of the sync dictionary. At least one of qsos and info is present.
 SYNC_QSOS = 'qsos'          # array of QSOs: additions, edits and tombstones alike
 SYNC_INFO = 'info'          # PeerContestInfo -- contest settings, unused here
-SYNC_CLOCK = 'vc'           # the sender's vector clock
+SYNC_CLOCK = 'vc'           # the sender's vector clock, present when the packet is a fill
 
-# QSO flag bits. Everything up to Practice comes from SkookumLogger 5.1; SkookumNet-2 appends the
-# last two. Deleted matters most: QSOs are never removed from a log any more, so anything counting
-# worked stations that ignores this bit keeps counting QSOs the operator deleted.
+# QSO flag bits (QSOFlagsMask). Everything up to Practice dates from SkookumLogger 5.1; the
+# automerge generation appended the last two. Deleted matters most: QSOs are never removed from a
+# log any more, so anything counting worked stations that ignores this bit keeps counting QSOs the
+# operator deleted.
 FLAG_VIABLE = 0x00000001
 FLAG_ZERO_POINT = 0x00000002
 FLAG_DUPLICATE = 0x00000004
@@ -142,34 +135,36 @@ def describe_flags(flags):
 
 
 def split_packet(packet):
-    """Split a decoded packet into (tag, epoch, payload), identifying each element by its type.
+    """Split a decoded packet into (tag, epoch, payload), or return None when it is malformed.
 
-    Position is deliberately not trusted. A SkookumLogger 5.x packet has no epoch element at all,
-    and a SkookumNet-2 packet whose sender has no epoch yet carries NSNull in its place. Picking
-    elements out by type handles every shape without having to know which one arrived.
+    The epoch comes back as None when the sender put NSNull there, meaning it has none yet. Any
+    other non-date in that slot makes the packet malformed, as it does on SkookumLogger's side.
     """
-    tag = None
-    epoch = None
-    payload = None
-
-    for element in packet:
-        if isinstance(element, NSNull):
-            continue  # an epoch the sender does not have yet
-        if tag is None and isinstance(element, (int, float, NSNumber)) and not isinstance(element, bool):
-            tag = int(element)
-        elif epoch is None and isinstance(element, NSDate):
-            epoch = element
-        elif payload is None:
-            payload = element
-
-    return tag, epoch, payload
+    if packet is None or len(packet) < 3:
+        return None
+    tag, epoch, payload = packet[0], packet[1], packet[2]
+    if isinstance(tag, bool) or not isinstance(tag, (int, NSNumber)):
+        return None
+    if epoch is None or isinstance(epoch, NSNull):
+        epoch = None  # PyObjC hands NSNull back as None once it has passed through a Python list
+    elif not isinstance(epoch, NSDate):
+        return None
+    return int(tag), epoch, payload
 
 
-def is_sync2_packet(packet):
-    """Return whether a packet came from a SkookumNet-2 peer.
+def describe_archive(data):
+    """Say what a packet that would not unarchive contained: its tag and the classes it names.
 
-    The generation shows in the shape: SkookumNet-2 always sends three elements, using NSNull for
-    an epoch it does not have yet, while 5.x sends two. Knowing which is which matters more for
-    sending than for receiving -- see the warning on the sending side.
+    The archive is read as a plain property list, so none of the objects in it are created --
+    which is the point, since one of them is what the unarchiver refused.
     """
-    return len(packet) >= 3
+    try:
+        archive = plistlib.loads(data)
+        objects = archive['$objects']
+        names = sorted({entry['$classname'] for entry in objects
+                        if isinstance(entry, dict) and '$classname' in entry})
+        root = objects[archive['$top']['root'].data]
+        tag = objects[root['NS.objects'][0].data]
+        return f'tag {tag}, classes {", ".join(names)}'
+    except (plistlib.InvalidFileException, KeyError, IndexError, TypeError, AttributeError, ValueError) as error:
+        return f'not a SkookumNet packet: {error}'

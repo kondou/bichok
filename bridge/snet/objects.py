@@ -9,7 +9,8 @@ versions, and a peer whose Run/S&P display goes blank is a far better outcome th
 away a packet full of QSOs because a single field changed shape.
 """
 import objc
-from Foundation import NSObject, NSSet, NSArray, NSString, NSNumber, NSDate, NSUUID, NSDictionary, NSNull
+from Foundation import (NSObject, NSSet, NSMutableSet, NSArray, NSMutableArray, NSString, NSMutableString,
+                        NSNumber, NSDate, NSUUID, NSDictionary, NSMutableDictionary, NSNull)
 
 NSSecureCoding = objc.protocolNamed('NSSecureCoding')
 
@@ -23,6 +24,42 @@ _CLOCK = NSSet.setWithArray_([NSDictionary, NSString, NSNumber])
 # Exchange packs its twelve fields into one array, in this order.
 EXCHANGE_FIELDS = ('call', 'check', 'clubName', 'clubStatus', 'grid', 'info',
                    'name', 'power', 'precedence', 'report', 'serial', 'zone')
+
+
+_UNSIGNED_FROM = 0x8000000000000000
+
+
+def foundation(value):
+    """Turn Python values into Foundation objects, all the way down, ready to be archived.
+
+    Handed to the archiver as they are, Python strings, dicts and lists are recorded under PyObjC's
+    own wrapper classes. SkookumLogger falls back to the Foundation class further up the chain and
+    reads them anyway, but a receiver that looks the wrapper up and finds it outside its allowed set
+    drops the whole packet. Sending what SkookumLogger itself sends rules that out. Integers too
+    large for a signed 64-bit number -- a log hash, typically -- go in unsigned. Anything that is
+    not a plain Python value passes through untouched.
+    """
+    if isinstance(value, bool):
+        return NSNumber.numberWithBool_(value)
+    if isinstance(value, int):
+        if value >= _UNSIGNED_FROM:
+            return NSNumber.numberWithUnsignedLongLong_(value)
+        return NSNumber.numberWithLongLong_(value)
+    if isinstance(value, float):
+        return NSNumber.numberWithDouble_(value)
+    if isinstance(value, str):
+        return NSString.stringWithString_(value)
+    if isinstance(value, dict):
+        converted = NSMutableDictionary.dictionary()
+        for key, item in value.items():
+            converted.setObject_forKey_(foundation(item), foundation(key))
+        return converted
+    if isinstance(value, (list, tuple)):
+        converted = NSMutableArray.array()
+        for item in value:
+            converted.addObject_(foundation(item))
+        return converted
+    return value
 
 
 def _decode(decoder, classes, key, default=None):
@@ -95,12 +132,14 @@ class Exchange(NSObject, protocols=[NSSecureCoding]):
         return f'Exchange({filled})'
 
 
-class TransientQso(NSObject, protocols=[NSSecureCoding]):
-    """A single QSO as it travels over SkookumNet.
+class _Formatter(NSObject, protocols=[NSSecureCoding]):
+    """A formatter SkookumLogger puts in a conflicting QSO's conflictInfo, decoded and discarded.
 
-    SkookumNet-2 adds the last four fields. Identity moved with them: a QSO is now identified by
-    its (stationName, sequenceID) pair rather than by its UUID, and deletions arrive as a flag on
-    the QSO instead of as a separate packet.
+    They describe how to display each conflicting field. Nothing here displays them, but the
+    classes have to exist under these names: one unknown class in an archive makes the unarchiver
+    reject the whole packet, and with it every other QSO travelling alongside. Reading none of
+    their fields keeps that working whatever they carry -- SerialInfoFormatter's keys, for one, are
+    not documented. They are never sent on.
     """
 
     @classmethod
@@ -109,7 +148,56 @@ class TransientQso(NSObject, protocols=[NSSecureCoding]):
         return True
 
     def initWithCoder_(self, decoder):
-        """Decode the QSO. Fields absent from an older peer simply stay empty."""
+        """Accept the archive without reading any of it."""
+        return self
+
+    def encodeWithCoder_(self, coder):
+        """Write nothing. This client never sends a formatter."""
+
+
+class OperatorsFormatter(_Formatter):
+    """Stands in for SkookumLogger's OperatorsFormatter."""
+
+
+class BooleanFormatter(_Formatter):
+    """Stands in for SkookumLogger's BooleanFormatter."""
+
+
+class FrequencyFormatter(_Formatter):
+    """Stands in for SkookumLogger's FrequencyFormatter."""
+
+
+class SerialInfoFormatter(_Formatter):
+    """Stands in for SkookumLogger's SerialInfoFormatter."""
+
+
+class TimestampFormatter(_Formatter):
+    """Stands in for SkookumLogger's TimestampFormatter."""
+
+
+_FORMATTERS = [OperatorsFormatter, BooleanFormatter, FrequencyFormatter, SerialInfoFormatter, TimestampFormatter]
+
+# What the dictionaries inside a QSO -- its clock, and above all its conflictInfo -- may hold. A
+# conflict records the competing values themselves, dates and arrays among them, and a formatter
+# for each; an unlisted class there fails the packet, not just the field.
+_QSO_DICTIONARY = NSSet.setWithArray_([NSDictionary, NSMutableDictionary, NSArray, NSMutableArray,
+                                       NSString, NSNumber, NSDate, NSNull] + _FORMATTERS)
+
+
+class TransientQso(NSObject, protocols=[NSSecureCoding]):
+    """A single QSO as it travels over SkookumNet.
+
+    A QSO is identified by its (stationName, sequenceID) pair; the UUID travels along but matches
+    nothing. A deletion arrives as a flag on the QSO, not as a packet of its own.
+    """
+
+    @classmethod
+    def supportsSecureCoding(cls):
+        """Required by NSSecureCoding."""
+        return True
+
+    def initWithCoder_(self, decoder):
+        """Decode the QSO. A field that is absent simply stays empty."""
         self.identifier = _decode(decoder, _UUID, 'identifier')
         self.timeStamp = _decode(decoder, _DATE, 'timeStamp')
         self.mainReceiveFrequency = _decode(decoder, _NUMBER, 'mainReceiveFrequency')
@@ -123,10 +211,9 @@ class TransientQso(NSObject, protocols=[NSSecureCoding]):
         self.notes = _decode(decoder, _STRING, 'notes', '')
         self.flags = _decode(decoder, _NUMBER, 'flags', 0)
 
-        # SkookumNet-2 additions
         self.sequenceID = _decode(decoder, _NUMBER, 'sequenceID')
-        self.vectorClock = _decode(decoder, _CLOCK, 'vectorClock')
-        self.conflictInfo = _decode(decoder, _CLOCK, 'conflictInfo')
+        self.vectorClock = _decode(decoder, _QSO_DICTIONARY, 'vectorClock')
+        self.conflictInfo = _decode(decoder, _QSO_DICTIONARY, 'conflictInfo')
         self.lastModifiedBy = _decode(decoder, _STRING, 'lastModifiedBy', '')
         return self
 
@@ -222,8 +309,8 @@ class Activity(TransientQso):
 class PeerInformation(NSObject, protocols=[NSSecureCoding]):
     """What each peer broadcasts about itself every few seconds.
 
-    Under SkookumNet-2 this doubles as a fill request: the vector clock it carries tells the other
-    peers what this station has seen, and anything they hold beyond that they push back.
+    It doubles as a fill request: the vector clock it carries tells the other peers what this
+    station has seen, and anything they hold beyond that they push back.
     """
 
     @classmethod
@@ -256,7 +343,7 @@ class PeerInformation(NSObject, protocols=[NSSecureCoding]):
         return self
 
     def initWithCoder_(self, decoder):
-        """Decode a peer record. A SkookumLogger 5.x peer has no value for the last two keys."""
+        """Decode a peer record."""
         self.peerHostName = _decode(decoder, _STRING, 'peerHostName', '')
         self.operatingMode = _decode_int(decoder, 'operatingMode')
         self.keyboardFocus = _decode_int(decoder, 'keyboardFocus')
@@ -272,8 +359,8 @@ class PeerInformation(NSObject, protocols=[NSSecureCoding]):
         self.vectorClock = _decode(decoder, _CLOCK, 'vectorClock')
         self.syncEpoch = _decode(decoder, _DATE, 'syncEpoch')
 
-        # The rest of what SkookumNet-2 added. binaryVersion identifies the sending build, and a
-        # peer whose value does not match is flagged as a version mismatch by SkookumLogger.
+        # binaryVersion identifies the sending build. SkookumLogger shares nothing but
+        # PeerInformation with a peer whose value differs from its own.
         self.binaryVersion = _decode(decoder, _STRING, 'binaryVersion')
         self.contestName = _decode(decoder, _STRING, 'contestName', '')
         self.contestStartTime = _decode(decoder, _DATE, 'contestStartTime')
@@ -287,31 +374,29 @@ class PeerInformation(NSObject, protocols=[NSSecureCoding]):
         return self
 
     def encodeWithCoder_(self, coder):
-        """Write every field, including the two SkookumNet-2 keys. A 5.x peer ignores what it does not know."""
-        coder.encodeObject_forKey_(self.peerHostName, 'peerHostName')
+        """Write every field, as the Foundation objects SkookumLogger itself sends."""
+        coder.encodeObject_forKey_(foundation(self.peerHostName), 'peerHostName')
         coder.encodeInteger_forKey_(self.operatingMode, 'operatingMode')
         coder.encodeInteger_forKey_(self.keyboardFocus, 'keyboardFocus')
         coder.encodeInteger_forKey_(self.transmitFocus, 'transmitFocus')
         coder.encodeInteger_forKey_(self.runReceiveFrequency, 'runReceiveFrequency')
         coder.encodeInteger_forKey_(self.runTransmitFrequency, 'runTransmitFrequency')
-        coder.encodeObject_forKey_(self.runMode, 'runMode')
+        coder.encodeObject_forKey_(foundation(self.runMode), 'runMode')
         coder.encodeInteger_forKey_(self.pounceReceiveFrequency, 'pounceReceiveFrequency')
         coder.encodeInteger_forKey_(self.pounceTransmitFrequency, 'pounceTransmitFrequency')
-        coder.encodeObject_forKey_(self.pounceMode, 'pounceMode')
-        coder.encodeObject_forKey_(self.lastTenRate, 'lastTenRate')
-        coder.encodeObject_forKey_(self.lastTenQsoPointRate, 'lastTenQsoPointRate')
-        coder.encodeObject_forKey_(self.vectorClock, 'vectorClock')
+        coder.encodeObject_forKey_(foundation(self.pounceMode), 'pounceMode')
+        coder.encodeObject_forKey_(foundation(self.lastTenRate), 'lastTenRate')
+        coder.encodeObject_forKey_(foundation(self.lastTenQsoPointRate), 'lastTenQsoPointRate')
+        coder.encodeObject_forKey_(foundation(self.vectorClock), 'vectorClock')
         coder.encodeObject_forKey_(self.syncEpoch, 'syncEpoch')
-        coder.encodeObject_forKey_(self.binaryVersion, 'binaryVersion')
-        coder.encodeObject_forKey_(self.contestName, 'contestName')
+        coder.encodeObject_forKey_(foundation(self.binaryVersion), 'binaryVersion')
+        coder.encodeObject_forKey_(foundation(self.contestName), 'contestName')
         coder.encodeObject_forKey_(self.contestStartTime, 'contestStartTime')
         coder.encodeObject_forKey_(self.contestEndTime, 'contestEndTime')
         coder.encodeObject_forKey_(self.timestamp, 'timestamp')
 
         # hashOfQSOs has to be a real NSNumber: it is compared with -[NSNumber isEqualToNumber:],
         # which needs an object on both sides, and both a primitive and a missing key arrive as nil.
-        # We cannot compute SkookumLogger's hash, so the number we send will not match it. Being
-        # told we are out of sync is the honest answer anyway.
         # Unsigned: the hash is a full 64-bit value, and the signed variant rejects anything with
         # the top bit set -- which a real log hash reaches as soon as the QSOs happen to land there.
         coder.encodeObject_forKey_(
@@ -349,17 +434,17 @@ class PeerContestInfo(NSObject, protocols=[NSSecureCoding]):
 
 
 def allowed_classes():
-    """Every class that may appear in a packet, for the secure unarchiver.
+    """Every class that may appear in a packet, for the secure unarchiver -- the set SkookumLogger
+    itself unarchives with.
 
     Collections propagate this set to what they contain, so the QSOs and the contest info nested
-    inside a sync dictionary are covered by naming them here.
+    inside a sync dictionary are covered by naming them here. Activity is not named and need not
+    be: it passes as a subclass of TransientQso. NSNull is what an epoch-less peer puts in the
+    epoch slot, and the unarchiver rejects the whole packet over one unlisted class -- without it,
+    nothing a freshly reset SkookumLogger sends would decode.
     """
-    from MultipeerConnectivity import MCPeerID  # pylint: disable=import-outside-toplevel
-    # NSNull is what an epoch-less peer puts in the epoch slot, and the unarchiver rejects the
-    # whole packet over one unlisted class -- without it, nothing a freshly reset SkookumLogger
-    # sends would decode. ContestPan hit exactly that from the other side and pointed it out here.
     return NSSet.setWithArray_([
-        NSArray, NSDictionary, NSString, NSNumber, NSDate, NSUUID, NSNull,
-        Exchange, TransientQso, Activity, PeerInformation, PeerContestInfo,
-        MCPeerID,
-    ])
+        NSArray, NSMutableArray, NSDictionary, NSMutableDictionary, NSSet, NSMutableSet,
+        NSString, NSMutableString, NSNumber, NSDate, NSUUID, NSNull,
+        PeerInformation, TransientQso, Exchange, PeerContestInfo,
+    ] + _FORMATTERS)

@@ -145,16 +145,26 @@ class WebBridge:
     # --- SkookumNet callbacks ---
 
     def session_started(self, contest):
-        """A peer joined the network."""
+        """A session began, or the contest it is about changed.
+
+        The page drops its live QSOs on hearing this, so everything held here goes out again right
+        behind it. Without that, a peer that reconnected would leave the page empty: the log we
+        already hold is not sent to us a second time.
+        """
         self.contest = contest or ''
-        self._broadcast({'type': 'startup', 'contest': self.contest})
+        messages = [{'type': 'startup', 'contest': self.contest}]
+        messages += [{'type': 'addQSO', 'contest': self.contest, 'qso': payload}
+                     for payload in self.cache.values()]
+        self._broadcast_all(messages)
+        if self.cache and self.clients:
+            logging.info("Sent the %d QSO(s) we hold to the page again", len(self.cache))
 
     def session_ended(self):
         """The last peer left."""
         self._broadcast({'type': 'shutdown', 'contest': self.contest})
 
     def log_cleared(self):
-        """The log was reset, either by an epoch change or by a 5.x peer replacing it."""
+        """The log was reset by an epoch change."""
         logging.info("Clearing the log")
         self.cache.clear()
         self._broadcast({'type': 'clearQSOs', 'contest': self.contest})
@@ -191,17 +201,22 @@ class WebBridge:
 
     def _broadcast(self, message):
         """Send a message to every browser. Safe to call from the Cocoa thread."""
+        self._broadcast_all([message])
+
+    def _broadcast_all(self, messages):
+        """Send messages to every browser, in order and as one piece of work."""
         if self.loop is None or not self.loop.is_running() or not self.clients:
             return
-        text = json.dumps(message, ensure_ascii=False)
-        asyncio.run_coroutine_threadsafe(self._send_to_all(text), self.loop)
+        texts = [json.dumps(message, ensure_ascii=False) for message in messages]
+        asyncio.run_coroutine_threadsafe(self._send_to_all(texts), self.loop)
 
-    async def _send_to_all(self, text):
+    async def _send_to_all(self, texts):
         """Write to every browser, dropping the ones that have gone away."""
         gone = set()
         for client in list(self.clients):
             try:
-                await client.send(text)
+                for text in texts:
+                    await client.send(text)
             except Exception:  # pylint: disable=broad-except
                 gone.add(client)
         self.clients -= gone

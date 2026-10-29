@@ -16,7 +16,7 @@ sleep 0.3
 # 依存はここで直接指定するため、プロジェクトファイル等は不要です
 # (--no-project: 同じフォルダに無関係な pyproject.toml があっても影響を受けない)
 uv run --no-project --python 3.13 \
-  --with pyobjc-framework-MultipeerConnectivity --with websockets \
+  --with pyobjc-framework-Cocoa --with websockets \
   python bridge/bichok_bridge.py "$@" &
 CLIENT_PID=$!
 

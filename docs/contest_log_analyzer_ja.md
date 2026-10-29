@@ -556,8 +556,8 @@ SkookumLogger の QSO 情報をリアルタイムで受信して表示。BicHok 
 
 ### 前提条件
 
-- **macOS**（この機能に限り macOS が必要。ブリッジが macOS の Multipeer Connectivity を使用するため）
-- SkookumLogger が起動していること
+- **macOS**（この機能に限り macOS が必要。ブリッジが macOS の機能を使用するため）
+- **SkookumLogger 6.1(16) 以降**が起動していること（それより前の SkookumLogger では BicHok 1.0.18 を使う）
 - SkookumNet ブリッジが起動していること（→ [ブリッジの起動](#ブリッジの起動)）
 - SkookumLogger と同じ L2 ネットワーク上にあること（同一 Mac 上で併用するのが最も簡単）
 - `uv` が導入されていること。未導入の場合はランチャーがインストールコマンドを表示する
@@ -578,7 +578,7 @@ SkookumLogger の QSO 情報をリアルタイムで受信して表示。BicHok 
 
 ```bash
 uv run --no-project --python 3.13 \
-  --with pyobjc-framework-MultipeerConnectivity --with websockets \
+  --with pyobjc-framework-Cocoa --with websockets \
   python bridge/bichok_bridge.py
 ```
 
@@ -598,7 +598,7 @@ uv run --no-project --python 3.13 \
 2. **新しいログを使い始めたときは、一度 Reset ボタンを押す。** ログの世代を示すエポックが発行される。エポックを発行できるのは SkookumLogger だけで、ブリッジは観測したエポックに従う
 3. **Join** をクリックする。Join するまで SkookumLogger は何も広告せず、ブリッジからは見えない
 
-ブリッジは `BicHok` という名前でピア表に現れる。複数の SkookumLogger から同時に招待を受けることもできる。
+ブリッジは SkookumLogger を自動で見つけて接続し、`BicHok` という名前でピア表に現れる。複数の SkookumLogger と同時につながることもできる。
 
 ### ブラウザ側の接続手順
 
@@ -772,10 +772,12 @@ X 軸起点
 - ファイアウォールやセキュリティソフトがポート 2237 をブロックしていないか
 
 ### ブリッジには接続できるが QSO が届かない
-- SkookumLogger が起動しているか
+- SkookumLogger が起動しているか。6.1(16) 以降か
 - SkookumLogger の **SkookumNet** ウィンドウで **Join** を実行したか。Join するまで SkookumLogger は何も広告しない
 - 新しいログで一度 **Reset** ボタンを押したか
 - ブリッジと SkookumLogger が同じ L2 ネットワーク上にあるか
+- macOS の **システム設定 › プライバシーとセキュリティ › ローカルネットワーク** で、ブリッジを起動したアプリ（ターミナル等）が許可されているか。拒否されているとブリッジのログに `local network access was denied` と出る
+- 同じネットワークに `BicHok` という名前の局がもう一つないか（ブリッジのログに警告が出る）。ある場合は `--name` で別の名前を付けて起動する
 - 詳しい状況は `bridge/bichok-bridge.log` を確認（`--debug` を付けて起動すると全パケットが記録される）
 
 ### ファイルが読み込めない
@@ -825,7 +827,7 @@ iPhone（Safari）等で利用可能。縦・横いずれの向きでも動作�
 
 ## ライセンス
 
-BicHok version 1.0.18  
+BicHok version 1.1.0  
 Copyright © 2026 kondou  
 MIT License にて公開。
 

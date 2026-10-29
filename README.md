@@ -37,7 +37,7 @@ bikhɔ́k.
 - A modern browser (Chrome / Chromium, Safari, Firefox, Edge)
 - Nothing else: the page runs from the filesystem, with no server, no Python
   and no installation
-- For live reception only: macOS, SkookumLogger, and
+- For live reception only: macOS, SkookumLogger 6.1(16) or later, and
   [uv](https://docs.astral.sh/uv/) — the launcher prints the install command if
   `uv` is missing
 

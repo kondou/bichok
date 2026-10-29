@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
-"""Checks the merge rules against the worked examples in the SkookumNetAutomerge article.
+"""Checks the merge rules against the worked examples in the SkookumNetAutomerge article, and the
+transport against the wire protocol.
 
 Run it directly:  python3 bridge/selftest.py
 
-Nothing here touches the network. The QSOs are stand-ins carrying just the fields the merge looks
-at, which is enough to exercise every branch of the algorithm.
+Nothing here needs SkookumLogger, Bonjour or a network: the transport checks talk to themselves
+over the loopback interface. The QSOs are stand-ins carrying just the fields the merge looks at,
+which is enough to exercise every branch of the algorithm.
 """
+import json
+import logging
 import os
+import plistlib
+import socket
+import struct
 import sys
+import threading
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 
@@ -15,6 +24,7 @@ from snet import clock as vclock                      # noqa: E402  pylint: disa
 from snet import protocol                             # noqa: E402  pylint: disable=wrong-import-position
 from snet import log as qsolog                        # noqa: E402  pylint: disable=wrong-import-position
 from snet import webbridge                            # noqa: E402  pylint: disable=wrong-import-position
+from snet import transport as sntransport            # noqa: E402  pylint: disable=wrong-import-position
 
 FAILURES = []
 
@@ -287,122 +297,78 @@ def test_qso_hash():
     check('the hash fits in 64 bits', qso('W3KX').qso_hash() < 2 ** 64, True)
 
 
-def test_silence_watchdog():
-    """A connected but silent session is rebuilt; a live or empty one is left alone.
+class RecordingTransport:
+    """Stands in for the transport, remembering what was sent through it."""
 
-    The dead-session shape comes from ContestPan's field observation: the peer is recreated on
-    the other side, no disconnect event ever arrives, and reception just stops. PeerInformation
-    is due every five seconds, so a long silence with peers connected can only mean the session
-    is dead.
-    """
-    print('silence watchdog')
-    import time  # pylint: disable=import-outside-toplevel
-    from MultipeerConnectivity import MCPeerID, MCSession  # pylint: disable=import-outside-toplevel
-    from snet.session import SkookumNetPeer  # pylint: disable=import-outside-toplevel
+    def __init__(self, peers):
+        self.connected = list(peers)
+        self.sent = []
 
-    class FakeSession:
-        """Stands in for MCSession, remembering whether it was torn down."""
-        def __init__(self, peers):
-            self.peers = peers
-            self.disconnected = False
-        def connectedPeers(self):
-            return self.peers
-        def setDelegate_(self, _delegate):
-            pass
-        def disconnect(self):
-            self.disconnected = True
+    def peers(self):
+        """The stations that count as connected."""
+        return list(self.connected)
 
-    class FakeListener:
-        """Records the one callback the rebuild makes."""
-        def __init__(self):
-            self.ended = False
-        def session_ended(self):
-            self.ended = True
+    def send(self, data):
+        """Record a packet instead of sending it."""
+        self.sent.append(data)
 
-    peer_id = MCPeerID.alloc().initWithDisplayName_('BicHok')
 
-    def build(peers):
-        listener = FakeListener()
-        session = FakeSession(peers)
-        made = SkookumNetPeer.alloc().initWithSession_peerID_listener_(session, peer_id, listener)
-        return made, session, listener
+class RecordingListener:
+    """Counts the callbacks the session makes."""
 
-    peer, session, _ = build([])
-    peer.last_received = time.monotonic() - 999
-    peer._check_silence()  # pylint: disable=protected-access
-    check('no peers means no rebuild', peer.session is session, True)
-    check('and the baseline is dropped', peer.last_received, None)
+    def __init__(self):
+        self.cleared = 0
+        self.started = []
+        self.ended = 0
 
-    peer, session, _ = build(['fake'])
-    peer.last_received = time.monotonic()
-    peer._check_silence()  # pylint: disable=protected-access
-    check('a live session is left alone', peer.session is session, True)
+    def log_cleared(self):
+        self.cleared += 1
 
-    peer, session, _ = build(['fake'])
-    peer.last_received = None
-    peer._check_silence()  # pylint: disable=protected-access
-    check('a connected peer with no baseline starts one', peer.last_received is not None, True)
-    check('without rebuilding', peer.session is session, True)
+    def session_started(self, contest):
+        self.started.append(contest)
 
-    peer, session, listener = build(['fake'])
-    peer.last_received = time.monotonic() - (protocol.SILENCE_TIMEOUT + 1)
-    peer._check_silence()  # pylint: disable=protected-access
-    check('a silent session is torn down', session.disconnected, True)
-    check('and replaced with a real one', isinstance(peer.session, MCSession), True)
-    check('the listener hears the session end', listener.ended, True)
-    check('the baseline resets for the next session', peer.last_received, None)
+    def session_ended(self):
+        self.ended += 1
+
+    def peer_information(self, info):
+        pass
+
+    def qso_added(self, qso):
+        pass
+
+    def qso_updated(self, qso):
+        pass
+
+    def qso_deleted(self, qso):
+        pass
+
+    def qso_conflicted(self, qso):
+        pass
 
 
 def build_peer(connected):
     """Return a SkookumNetPeer wired to recording stand-ins, plus those stand-ins.
 
-    The session records what gets sent instead of sending it, and the listener counts the
+    The transport records what gets sent instead of sending it, and the listener counts the
     callbacks the epoch rules make. Nothing touches the network.
     """
-    from MultipeerConnectivity import MCPeerID  # pylint: disable=import-outside-toplevel
     from snet.session import SkookumNetPeer  # pylint: disable=import-outside-toplevel
 
-    class RecordingSession:
-        """Stands in for MCSession, remembering what was sent through it."""
-        def __init__(self, peers):
-            self.peers = list(peers)
-            self.sent = []
-        def connectedPeers(self):
-            return self.peers
-        def setDelegate_(self, _delegate):
-            pass
-        def disconnect(self):
-            pass
-        def sendData_toPeers_withMode_error_(self, data, peers, mode, error):  # pylint: disable=unused-argument
-            self.sent.append(data)
-            return (True, None)
-
-    class RecordingListener:
-        """Counts the callbacks the session makes."""
-        def __init__(self):
-            self.cleared = 0
-        def log_cleared(self):
-            self.cleared += 1
-        def session_started(self, contest):
-            pass
-        def session_ended(self):
-            pass
-        def peer_information(self, info):
-            pass
-        def qso_added(self, qso):
-            pass
-        def qso_updated(self, qso):
-            pass
-        def qso_deleted(self, qso):
-            pass
-        def qso_conflicted(self, qso):
-            pass
-
     listener = RecordingListener()
-    session = RecordingSession(connected)
-    peer_id = MCPeerID.alloc().initWithDisplayName_('BicHok')
-    peer = SkookumNetPeer.alloc().initWithSession_peerID_listener_(session, peer_id, listener)
-    return peer, session, listener
+    peer = SkookumNetPeer.alloc().initWithStation_listener_('BicHok', listener)
+    peer.transport = RecordingTransport(connected)
+    return peer, peer.transport, listener
+
+
+def archived(packet):
+    """Archive a packet the way a peer would send it."""
+    from Foundation import NSKeyedArchiver  # pylint: disable=import-outside-toplevel
+    from snet.objects import foundation  # pylint: disable=import-outside-toplevel
+
+    data, error = NSKeyedArchiver.archivedDataWithRootObject_requiringSecureCoding_error_(
+        foundation(packet), True, None)
+    assert error is None, error
+    return bytes(data)
 
 
 def test_owner_epoch_rules():
@@ -479,10 +445,8 @@ def test_owner_identification():
     check('a PeerInformation does not, passive peers send those too',
           peer._marks_owner(protocol.PEER_INFORMATION,  # pylint: disable=protected-access
                             PeerInformation.alloc().initWithStationName_('CP')), False)
-    check('a 5.x delete list marks the owner',
-          peer._marks_owner(protocol.LEGACY_DELETE_QSOS, [qso]), True)  # pylint: disable=protected-access
-    check('a list under any other tag does not',
-          peer._marks_owner(protocol.LEGACY_GAB, [qso]), False)  # pylint: disable=protected-access
+    check('nor does a serial number dictionary',
+          peer._marks_owner(protocol.SERIAL_NUMBER, {'qsos': [qso]}), False)  # pylint: disable=protected-access
 
     peer._learn_owner('SL')  # pylint: disable=protected-access
     check('the owner is remembered', peer.owner, 'SL')
@@ -534,7 +498,6 @@ def test_reply_announce():
         return info
 
     peer, session, _ = build_peer(['fake'])
-    peer.dialect = 'sync2'
 
     peer._handle_peer_information(advertisement('CP'), 'CP')  # pylint: disable=protected-access
     check('with no owner known, anyone is answered', len(session.sent), 1)
@@ -549,51 +512,6 @@ def test_reply_announce():
 
     peer._handle_peer_information(advertisement('SL'), 'SL')  # pylint: disable=protected-access
     check('while the owner always is', len(session.sent), 2)
-
-
-def test_readvertise():
-    """A long wait with nobody connected replaces the advertisement, and keeps replacing it."""
-    print('re-advertising when alone')
-    import time  # pylint: disable=import-outside-toplevel
-
-    class FakeAdvertiser:
-        """Stands in for MCNearbyServiceAdvertiser."""
-        def __init__(self):
-            self.advertising = False
-        def startAdvertisingPeer(self):
-            self.advertising = True
-        def stopAdvertisingPeer(self):
-            self.advertising = False
-
-    peer, session, _ = build_peer([])
-    peer.service_type = 'skookumnetwork'
-    peer._make_advertiser = FakeAdvertiser  # pylint: disable=protected-access
-    first = FakeAdvertiser()
-    first.advertising = True
-    peer.advertiser = first
-
-    peer._check_alone()  # pylint: disable=protected-access
-    check('the first lonely look starts the clock', peer.alone_since is not None, True)
-    check('without replacing anything', peer.advertiser is first, True)
-
-    peer.alone_since = time.monotonic() - (protocol.READVERTISE_TIMEOUT + 1)
-    peer._check_alone()  # pylint: disable=protected-access
-    check('the timeout replaces the advertiser', peer.advertiser is not first, True)
-    check('the old one was withdrawn', first.advertising, False)
-    check('the new one is advertising', peer.advertiser.advertising, True)
-    check('and the clock restarts for the next round', peer.alone_since is not None, True)
-
-    second = peer.advertiser
-    peer.alone_since = time.monotonic() - (protocol.READVERTISE_TIMEOUT + 1)
-    peer._check_alone()  # pylint: disable=protected-access
-    check('it repeats for as long as nobody connects', peer.advertiser is not second, True)
-
-    third = peer.advertiser
-    session.peers = ['fake']
-    peer.alone_since = time.monotonic() - (protocol.READVERTISE_TIMEOUT + 1)
-    peer._check_alone()  # pylint: disable=protected-access
-    check('a connected peer stops the clock', peer.alone_since is None, True)
-    check('and the advertiser stays', peer.advertiser is third, True)
 
 
 def test_duplicate_fill():
@@ -635,6 +553,479 @@ def test_null_epoch_packet():
     check('and the clock is intact', vclock.to_dict(payload['vc']) if payload else None, {'SL': 1})
 
 
+def test_packet_shape():
+    """A packet is [tag, epoch, payload]; NSNull stands for no epoch, and anything else is malformed."""
+    print('packet shape')
+    from Foundation import NSDate, NSNull  # pylint: disable=import-outside-toplevel
+
+    now = NSDate.date()
+    check('a dated packet splits', protocol.split_packet([6, now, 'x']), (6, now, 'x'))
+    check('NSNull reads as no epoch', protocol.split_packet([1, NSNull.null(), 'x']), (1, None, 'x'))
+    check('two elements are malformed', protocol.split_packet([1, now]), None)
+    check('an epoch that is not a date is malformed', protocol.split_packet([1, 'soon', 'x']), None)
+    check('a tag that is not a number is malformed', protocol.split_packet(['1', now, 'x']), None)
+    check('nothing at all is malformed', protocol.split_packet(None), None)
+
+
+def test_framing():
+    """Frames survive being split and joined in transit, and a bad length is caught."""
+    print('framing')
+    hello = sntransport.frame(protocol.FRAME_HELLO, b'{}')
+    check('the length counts the kind byte and the payload', hello[:4], struct.pack('>I', 3))
+    check('the kind follows the length', hello[4], protocol.FRAME_HELLO)
+
+    data = sntransport.frame(protocol.FRAME_DATA, b'packet')
+    buffer = bytearray(hello + data[:5])
+    frames, intact = sntransport.unframe(buffer)
+    check('a whole frame comes off the front', frames, [(protocol.FRAME_HELLO, b'{}')])
+    check('and the stream is still sound', intact, True)
+    check('a partial frame waits for the rest', bytes(buffer), data[:5])
+    buffer.extend(data[5:])
+    frames, _ = sntransport.unframe(buffer)
+    check('and comes off once complete', frames, [(protocol.FRAME_DATA, b'packet')])
+    check('leaving nothing behind', len(buffer), 0)
+
+    buffer = bytearray(data + struct.pack('>I', 0) + b'\x01')
+    frames, intact = sntransport.unframe(buffer)
+    check('a zero length is malformed', intact, False)
+    check('but the frame before it is kept', frames, [(protocol.FRAME_DATA, b'packet')])
+    buffer = bytearray(struct.pack('>I', protocol.FRAME_LIMIT + 1) + b'\x01')
+    check('a length over 64 MB is malformed', sntransport.unframe(buffer)[1], False)
+    buffer = bytearray(struct.pack('>I', protocol.FRAME_LIMIT))
+    check('64 MB itself is allowed, and waited for', sntransport.unframe(buffer), ([], True))
+
+
+def test_hello():
+    """A hello names a valid UUID and a non-empty station name, or the connection is closed."""
+    print('hello')
+    good = '6f1c3b2e-0000-4000-8000-000000000001'
+
+    def hello(**fields):
+        return json.dumps(fields).encode('utf-8')
+
+    check('a good hello reads, its UUID uppercased',
+          sntransport.read_hello(hello(version=1, uuid=good, name='Phobos')), (good.upper(), 'Phobos'))
+    check('the version is not checked',
+          sntransport.read_hello(hello(version=99, uuid=good, name='Phobos')) is not None, True)
+    check('no name is malformed', sntransport.read_hello(hello(version=1, uuid=good)), None)
+    check('an empty name is malformed', sntransport.read_hello(hello(version=1, uuid=good, name='')), None)
+    check('a bad UUID is malformed', sntransport.read_hello(hello(version=1, uuid='nope', name='Phobos')), None)
+    check('a missing UUID is malformed', sntransport.read_hello(hello(version=1, name='Phobos')), None)
+    check('a JSON array is malformed', sntransport.read_hello(b'[1, 2]'), None)
+    check('text that is not JSON is malformed', sntransport.read_hello(b'hello'), None)
+    check('bytes that are not UTF-8 are malformed', sntransport.read_hello(b'\xff\xfe'), None)
+
+
+def test_who_connects():
+    """Of each pair, the station whose name sorts first opens the connection."""
+    print('who connects')
+    check('Macbook-Air connects to Phobos', sntransport.opens_connection('Macbook-Air', 'Phobos'), True)
+    check('and to Trinity', sntransport.opens_connection('Macbook-Air', 'Trinity'), True)
+    check('Phobos connects to Trinity', sntransport.opens_connection('Phobos', 'Trinity'), True)
+    check('Trinity waits for Phobos', sntransport.opens_connection('Trinity', 'Phobos'), False)
+    check('BicHok connects to Dismal', sntransport.opens_connection('BicHok', 'Dismal'), True)
+
+
+def test_duplicate_choice():
+    """When two connections to the same peer exist, both stations keep the same one."""
+    print('duplicate connections')
+
+    class Link:
+        """A connection as each station sees it: which way it runs from that station's side."""
+        def __init__(self, name, outgoing):
+            self.name = name
+            self.outgoing = outgoing
+
+    big, small = 'F0000000-0000-4000-8000-000000000000', '10000000-0000-4000-8000-000000000000'
+    # X was opened by the station with the larger UUID, Y by the one with the smaller
+    at_big = {'X': Link('X', True), 'Y': Link('Y', False)}
+    at_small = {'X': Link('X', False), 'Y': Link('Y', True)}
+
+    def kept(links, first, second, ours, theirs):
+        return sntransport.keeper(links[first], links[second], ours, theirs).name
+
+    check('the larger UUID gives up its outgoing connection',
+          kept(at_big, 'X', 'Y', big, small), 'Y')
+    check('whichever hello arrives first', kept(at_big, 'Y', 'X', big, small), 'Y')
+    check('the smaller UUID gives up its incoming one, so it keeps the same',
+          kept(at_small, 'X', 'Y', small, big), 'Y')
+    check('again whichever arrives first', kept(at_small, 'Y', 'X', small, big), 'Y')
+    check('UUIDs compare as uppercase strings',
+          kept(at_big, 'X', 'Y', big.lower(), small), 'Y')
+    check('two connections the same way mean a reconnect, so the newer one stays',
+          sntransport.keeper(Link('old', True), Link('new', True), big, small).name, 'new')
+
+
+def test_serial_number_ignored():
+    """A serial number packet is a dictionary like a sync packet, and must not be taken for one."""
+    print('serial number packets')
+    from Foundation import NSDate  # pylint: disable=import-outside-toplevel
+
+    epoch = NSDate.dateWithTimeIntervalSince1970_(1000.0)
+    peer, _, listener = build_peer(['SL'])
+    peer.receive_({'peer': 'SL', 'data': archived([protocol.SERIAL_NUMBER, epoch, {'op': 'next'}])})
+    check('it does not make its sender the owner', peer.owner, None)
+    check('nor move the epoch', peer.epoch, None)
+    check('nor clear the log', listener.cleared, 0)
+
+    peer.receive_({'peer': 'SL', 'data': archived([protocol.SYNC_QSO, epoch, {'vc': {'SL': 1}}])})
+    check('while a sync packet does make its sender the owner', peer.owner, 'SL')
+    check('and brings its epoch', peer.epoch is not None and peer.epoch.compare_(epoch) == 0, True)
+
+
+def test_epochless_packets():
+    """Without an epoch, only PeerInformation is acted on, as on SkookumLogger's side."""
+    print('packets without an epoch')
+    from Foundation import NSNull  # pylint: disable=import-outside-toplevel
+
+    peer, _, listener = build_peer(['SL'])
+    clock = {'qsos': [], 'vc': {'SL': 1}}
+    peer.receive_({'peer': 'SL', 'data': archived([protocol.SYNC_QSO, NSNull.null(), clock])})
+    check('an epoch-less sync packet names no owner', peer.owner, None)
+    check('and its clock is not taken in', peer.log.node_clock, {})
+    check('nor is anything cleared', listener.cleared, 0)
+
+
+def test_conflict_info_decodes():
+    """A conflicting QSO's conflictInfo carries dates, arrays, NSNull and formatters, and none of
+    them may cost us the packet -- one unlisted class used to reject a whole fill."""
+    print('conflictInfo contents')
+    from Foundation import NSDate, NSKeyedUnarchiver, NSNull, NSNumber, NSUUID  # pylint: disable=import-outside-toplevel
+    from snet import objects  # pylint: disable=import-outside-toplevel
+
+    def exchange(call):
+        made = objects.Exchange.alloc().init()
+        for name in objects.EXCHANGE_FIELDS:
+            setattr(made, name, '')
+        made.call = call
+        return made
+
+    def qso(conflict):
+        made = objects.TransientQso.alloc().init()
+        made.identifier = NSUUID.UUID()
+        made.timeStamp = NSDate.date()
+        made.mainReceiveFrequency = 14025000
+        made.subReceiveFrequency = 0
+        made.transmitFrequency = 14025000
+        made.mode = 'CW'
+        made.sentExchange = exchange('JH5GHM')
+        made.receivedExchange = exchange('W3KX')
+        made.operatorCall = 'JH5GHM'
+        made.stationName = 'SL'
+        made.notes = ''
+        made.flags = 0
+        made.sequenceID = 1
+        made.vectorClock = objects.foundation({'SL': 1})
+        made.conflictInfo = objects.foundation(conflict)
+        made.lastModifiedBy = 'SL'
+        return made
+
+    epoch = NSDate.date()
+    for label, conflict in (('a date', {'timeStamp': NSDate.date()}),
+                            ('an array', {'mode': ['CW', 'SSB']}),
+                            ('NSNull', {'notes': NSNull.null()}),
+                            ('a number', {'flags': NSNumber.numberWithInt_(5)}),
+                            ('every formatter', {name: cls.alloc().init() for name, cls in (
+                                ('operatorCall', objects.OperatorsFormatter),
+                                ('flags', objects.BooleanFormatter),
+                                ('mainReceiveFrequency', objects.FrequencyFormatter),
+                                ('serial', objects.SerialInfoFormatter),
+                                ('timeStamp', objects.TimestampFormatter))})):
+        data = archived([protocol.SYNC_QSO, epoch, {'qsos': [qso(conflict), qso(None)]}])
+        packet, error = NSKeyedUnarchiver.unarchivedObjectOfClasses_fromData_error_(
+            objects.allowed_classes(), data, None)
+        decoded = protocol.split_packet(packet) if error is None else None
+        qsos = decoded[2]['qsos'] if decoded else []
+        check(f'a fill whose conflictInfo holds {label} decodes whole', len(qsos), 2)
+        if qsos:
+            check(f'and the QSO with {label} still hashes', qsos[0].qso_hash() > 0, True)
+
+
+def test_sent_archive_is_foundation():
+    """What we send carries the Foundation classes SkookumLogger sends, not PyObjC's wrappers."""
+    print('the classes we send')
+    from Foundation import NSDate  # pylint: disable=import-outside-toplevel
+
+    peer, transport, _ = build_peer(['SL'])
+    peer.epoch = NSDate.date()
+    peer.contest = 'CQ World Wide DX Contest CW'
+    peer.known_stations = {'SL'}
+    peer.announce_(None)
+    check('one packet went out', len(transport.sent), 1)
+    if transport.sent:
+        archive = plistlib.loads(transport.sent[0])
+        names = {name for entry in archive['$objects'] if isinstance(entry, dict)
+                 for name in entry.get('$classes', [])}
+        check('no PyObjC wrapper class appears in it',
+              sorted(name for name in names if name.startswith('OC_')), [])
+        check('the packet itself is an array', 'NSArray' in names, True)
+
+
+def test_session_start():
+    """The session starts on the first PeerInformation, which is where the contest name now comes
+    from, starts again only when that name changes or after everyone left, and copies what it
+    echoes from the owner alone once there is one."""
+    print('session start')
+    from snet.objects import PeerInformation  # pylint: disable=import-outside-toplevel
+
+    def advertisement(name, contest, version='SL-6.1-16'):
+        info = PeerInformation.alloc().initWithStationName_(name)
+        info.hashOfQSOs = None
+        info.contestName = contest
+        info.binaryVersion = version
+        return info
+
+    peer, transport, listener = build_peer(['SL'])
+    peer.peerConnected_({'peer': 'SL'})
+    check('a connection alone starts nothing', listener.started, [])
+    peer._handle_peer_information(advertisement('SL', 'CQ WW CW'), 'SL')  # pylint: disable=protected-access
+    check('the first PeerInformation starts the session with its contest', listener.started, ['CQ WW CW'])
+    peer._handle_peer_information(advertisement('SL', 'CQ WW CW'), 'SL')  # pylint: disable=protected-access
+    check('the next one does not start it again', listener.started, ['CQ WW CW'])
+
+    peer.owner = 'SL'
+    peer._handle_peer_information(advertisement('CP', 'Other', 'BicHok-1.0'), 'CP')  # pylint: disable=protected-access
+    check('a passive peer does not change the contest we echo', peer.contest, 'CQ WW CW')
+    check('nor the build', peer.peer_version, 'SL-6.1-16')
+
+    peer._handle_peer_information(advertisement('SL', 'CQ WW SSB'), 'SL')  # pylint: disable=protected-access
+    check('the owner moving to another contest starts the session afresh',
+          listener.started, ['CQ WW CW', 'CQ WW SSB'])
+
+    transport.connected = []
+    peer.peerDisconnected_({'peer': 'SL'})
+    check('the last peer leaving ends the session', listener.ended, 1)
+    transport.connected = ['SL']
+    peer._handle_peer_information(advertisement('SL', 'CQ WW SSB'), 'SL')  # pylint: disable=protected-access
+    check('and its return starts it again', listener.started[-1], 'CQ WW SSB')
+    check('three starts in all', len(listener.started), 3)
+
+
+def test_restart_replays():
+    """A session that starts again resends the held QSOs right behind the startup message,
+    because the page drops its live QSOs on hearing it."""
+    print('replay on a new session')
+    bridge = webbridge.WebBridge()
+    sent = []
+    bridge._broadcast_all = sent.extend  # pylint: disable=protected-access
+    bridge.cache = {'a': {'id': 'a'}, 'b': {'id': 'b'}}
+    bridge.session_started('CQ WW CW')
+    check('startup goes first', sent[0], {'type': 'startup', 'contest': 'CQ WW CW'})
+    check('then every held QSO', [message['qso']['id'] for message in sent[1:]], ['a', 'b'])
+    check('as additions', {message['type'] for message in sent[1:]}, {'addQSO'})
+
+
+class _Events:
+    """Records a transport's delegate callbacks, which arrive on the transport's thread."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.items = []
+
+    def transport_connected(self, name):
+        with self.lock:
+            self.items.append(('connected', name))
+
+    def transport_disconnected(self, name):
+        with self.lock:
+            self.items.append(('disconnected', name))
+
+    def transport_received(self, name, data):
+        with self.lock:
+            self.items.append(('data', name, bytes(data)))
+
+    def snapshot(self):
+        with self.lock:
+            return list(self.items)
+
+
+def _wait_for(condition, seconds=5.0):
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if condition():
+            return True
+        time.sleep(0.02)
+    return condition()
+
+
+def _live_socket(transport):
+    """The socket of the one connection that counts, for checking both ends agree on it."""
+    connections = list(transport._live.values())  # pylint: disable=protected-access
+    return connections[0].sock if len(connections) == 1 else None
+
+
+def test_transport_loopback():
+    """Two transports find each other's listeners, say hello, and carry packets -- over loopback,
+    without Bonjour."""
+    print('transport over loopback')
+    alpha_events, bravo_events = _Events(), _Events()
+    alpha = sntransport.Transport('Alpha', alpha_events, discover=False)
+    bravo = sntransport.Transport('Bravo', bravo_events, discover=False)
+    alpha.start()
+    bravo.start()
+    try:
+        bravo.add_service(alpha.uuid, 'Alpha', '127.0.0.1', alpha.port)  # Bravo sorts second and waits
+        alpha.add_service(bravo.uuid, 'Bravo', '127.0.0.1', bravo.port)  # Alpha sorts first and connects
+        check('both ends count the connection',
+              _wait_for(lambda: alpha.peers() == ['Bravo'] and bravo.peers() == ['Alpha']), True)
+        check('each reported its peer once',
+              (alpha_events.snapshot(), bravo_events.snapshot()),
+              ([('connected', 'Bravo')], [('connected', 'Alpha')]))
+
+        alpha.send(b'from alpha')
+        bravo.send(b'from bravo')
+        check('a packet arrives as it was sent',
+              _wait_for(lambda: ('data', 'Alpha', b'from alpha') in bravo_events.snapshot()), True)
+        check('in both directions',
+              _wait_for(lambda: ('data', 'Bravo', b'from bravo') in alpha_events.snapshot()), True)
+
+        bravo.stop()
+        check('a peer that leaves is reported gone',
+              _wait_for(lambda: ('disconnected', 'Bravo') in alpha_events.snapshot()), True)
+        check('and no longer counts', alpha.peers(), [])
+    finally:
+        alpha.stop()
+        bravo.stop()
+
+
+def test_transport_duplicates():
+    """Two stations that dial each other at once end up on one and the same connection."""
+    print('transport duplicates over loopback')
+    charlie_events, delta_events = _Events(), _Events()
+    charlie = sntransport.Transport('Charlie', charlie_events, discover=False)
+    delta = sntransport.Transport('Delta', delta_events, discover=False)
+    charlie.start()
+    delta.start()
+    try:
+        # Both dial at once, as the fallback can make happen
+        to_delta = sntransport._Service(delta.uuid, 'Delta', '127.0.0.1', delta.port)  # pylint: disable=protected-access
+        to_charlie = sntransport._Service(charlie.uuid, 'Charlie', '127.0.0.1', charlie.port)  # pylint: disable=protected-access
+        charlie._post(lambda: charlie._dial(to_delta))  # pylint: disable=protected-access
+        delta._post(lambda: delta._dial(to_charlie))  # pylint: disable=protected-access
+        check('both ends count one peer',
+              _wait_for(lambda: charlie.peers() == ['Delta'] and delta.peers() == ['Charlie']), True)
+        time.sleep(protocol.DUPLICATE_LINGER + 0.5)
+        ours, theirs = _live_socket(charlie), _live_socket(delta)
+        # Ports, not whole addresses: the listener takes IPv4 as IPv4-mapped IPv6
+        check('and both kept the same connection',
+              ours is not None and theirs is not None
+              and (ours.getsockname()[1], ours.getpeername()[1]) == (theirs.getpeername()[1], theirs.getsockname()[1]),
+              True)
+        check('the loser closed without the peer ever reading as gone',
+              [event for event in charlie_events.snapshot() + delta_events.snapshot()
+               if event[0] == 'disconnected'], [])
+        charlie.send(b'still here')
+        check('and packets still flow',
+              _wait_for(lambda: ('data', 'Charlie', b'still here') in delta_events.snapshot()), True)
+    finally:
+        charlie.stop()
+        delta.stop()
+
+
+def test_transport_guards():
+    """A raw socket that breaks the rules is turned away."""
+    print('transport guards')
+    events = _Events()
+    echo = sntransport.Transport('Echo', events, discover=False, max_peers=1)
+    echo.start()
+
+    def dial():
+        sock = socket.create_connection(('127.0.0.1', echo.port), timeout=5)
+        sock.settimeout(5)
+        return sock
+
+    def hello(sock, peer_uuid, name):
+        payload = json.dumps({'version': 1, 'uuid': peer_uuid, 'name': name}).encode('utf-8')
+        sock.sendall(sntransport.frame(protocol.FRAME_HELLO, payload))
+
+    def closed_by_echo(sock):
+        """Read past Echo's own hello until the connection ends; True when Echo closed it."""
+        try:
+            while True:
+                if not sock.recv(65536):
+                    return True
+        except socket.timeout:
+            return False
+        except OSError:
+            return True
+
+    try:
+        sock = dial()
+        sock.sendall(struct.pack('>I', 0) + b'\x01')
+        check('a zero-length frame closes the connection', closed_by_echo(sock), True)
+        sock.close()
+
+        sock = dial()
+        sock.sendall(sntransport.frame(protocol.FRAME_HELLO, b'not json'))
+        check('a malformed hello closes it', closed_by_echo(sock), True)
+        sock.close()
+
+        sock = dial()
+        hello(sock, echo.uuid, 'Echo')
+        check('a hello carrying our own UUID closes it', closed_by_echo(sock), True)
+        sock.close()
+
+        first = dial()
+        first.sendall(sntransport.frame(protocol.FRAME_DATA, b'too early'))
+        hello(first, '20000000-0000-4000-8000-000000000001', 'Foxtrot')
+        check('a good hello connects', _wait_for(lambda: echo.peers() == ['Foxtrot']), True)
+        check('and data sent before it was dropped',
+              [event for event in events.snapshot() if event[0] == 'data'], [])
+        first.sendall(sntransport.frame(9, b'from the future'))
+        first.sendall(sntransport.frame(protocol.FRAME_DATA, b'on time'))
+        check('an unknown frame kind is skipped, and what follows arrives',
+              _wait_for(lambda: ('data', 'Foxtrot', b'on time') in events.snapshot()), True)
+
+        second = dial()
+        hello(second, '30000000-0000-4000-8000-000000000001', 'Golf')
+        check('past the peer limit a new connection is closed once its hello arrives',
+              closed_by_echo(second), True)
+        second.close()
+        check('leaving the first in place', echo.peers(), ['Foxtrot'])
+        first.close()
+    finally:
+        echo.stop()
+
+
+def test_transport_unreachable():
+    """A station advertised where nothing listens is given up on cleanly. The failure is handed
+    back to the transport's thread after the connecting thread's except clause has ended, which
+    is exactly where a carelessly captured exception name has already gone."""
+    print('transport to an unreachable station')
+    records = []
+
+    class Capture(logging.Handler):
+        """Keeps what the transport logs."""
+        def emit(self, record):
+            records.append(record.getMessage())
+
+    capture = Capture()
+    root = logging.getLogger()
+    level = root.level
+    root.addHandler(capture)
+    root.setLevel(logging.INFO)
+    events = _Events()
+    hotel = sntransport.Transport('Hotel', events, discover=False)
+    hotel.start()
+    try:
+        spare = socket.socket()
+        spare.bind(('127.0.0.1', 0))
+        closed_port = spare.getsockname()[1]
+        spare.close()  # nothing listens there now
+        hotel.add_service('40000000-0000-4000-8000-000000000001', 'India', '127.0.0.1', closed_port)
+        check('the failed attempt is reported',
+              _wait_for(lambda: any('could not connect to India' in record for record in records)), True)
+        check('without an unexpected error',
+              [record for record in records if 'unexpected error' in record], [])
+        check('and nothing is left waiting for a hello',
+              _wait_for(lambda: not hotel._pending), True)  # pylint: disable=protected-access
+        check('with nobody reported connected', events.snapshot(), [])
+    finally:
+        hotel.stop()
+        root.removeHandler(capture)
+        root.setLevel(level)
+
+
 def test_browser_token():
     """A browser is served only when it presents the token left beside the page."""
     import tempfile  # pylint: disable=import-outside-toplevel
@@ -664,9 +1055,14 @@ def main():
     for test in (test_clock_relationships, test_example_one, test_example_three,
                  test_no_action_cases, test_in_place_rewrite, test_tombstones, test_identity,
                  test_peer_information_roundtrip, test_log_hash, test_qso_hash,
-                 test_silence_watchdog, test_owner_epoch_rules, test_owner_identification,
-                 test_owner_going_epochless, test_reply_announce, test_readvertise,
-                 test_duplicate_fill, test_null_epoch_packet, test_browser_token):
+                 test_owner_epoch_rules, test_owner_identification,
+                 test_owner_going_epochless, test_reply_announce,
+                 test_duplicate_fill, test_null_epoch_packet, test_packet_shape, test_framing,
+                 test_hello, test_who_connects, test_duplicate_choice, test_serial_number_ignored,
+                 test_epochless_packets, test_conflict_info_decodes, test_sent_archive_is_foundation,
+                 test_session_start, test_restart_replays, test_transport_loopback,
+                 test_transport_duplicates, test_transport_guards, test_transport_unreachable,
+                 test_browser_token):
         test()
 
     print()

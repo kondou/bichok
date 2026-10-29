@@ -27,9 +27,8 @@ _COMPARED_FIELDS = ('timeStamp', 'mainReceiveFrequency', 'subReceiveFrequency', 
 def qso_key(qso):
     """Return the identity of a QSO.
 
-    SkookumNet-2 pairs the station name with a sequence ID. A SkookumLogger 5.x QSO has no
-    sequence ID, so its UUID stands in -- the two generations never share a log, so the two
-    key shapes never collide.
+    SkookumNet-2 pairs the station name with a sequence ID. A QSO arriving without a sequence ID
+    has its UUID stand in rather than being lost; the two key shapes cannot collide.
     """
     sequence = getattr(qso, 'sequenceID', None)
     if sequence is not None:
@@ -76,7 +75,7 @@ class QsoLog:
         return result
 
     def clear(self):
-        """Drop everything. Used on an epoch reset and when a 5.x peer replaces the log."""
+        """Drop everything. Used when the log moves to another epoch."""
         self.qsos.clear()
         self.clocks.clear()
         self.node_clock = {}
@@ -135,16 +134,3 @@ class QsoLog:
         if is_deleted(qso):
             return None if was_deleted else DELETED
         return ADDED if was_deleted else UPDATED
-
-    # --- SkookumLogger 5.x paths, where the packet itself names the operation ---
-
-    def legacy_add(self, qso):
-        """Record a QSO announced by a 5.x peer."""
-        key = qso_key(qso)
-        existed = key in self.qsos
-        self.qsos[key] = qso
-        return UPDATED if existed else ADDED
-
-    def legacy_delete(self, qso):
-        """Forget a QSO a 5.x peer deleted. Tombstones do not exist in that generation."""
-        return DELETED if self.qsos.pop(qso_key(qso), None) is not None else None

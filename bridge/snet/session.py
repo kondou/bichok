@@ -1,8 +1,8 @@
-"""The SkookumNet peer itself: discovery, packet decoding, and the sync state machine.
+"""The SkookumNet peer itself: packet decoding and the sync state machine.
 
-This peer only listens. It advertises itself so SkookumLogger can invite it, broadcasts its own
-PeerInformation so it takes part in the sync properly, and never sends anything that could change
-another station's log.
+This peer only listens. The transport finds SkookumLogger and keeps a connection to it; this side
+broadcasts its own PeerInformation so it takes part in the sync properly, and never sends anything
+that could change another station's log.
 
 Three rules govern the sync epoch and all of them matter:
 
@@ -33,18 +33,12 @@ import pprint
 import time
 
 import objc
-from Foundation import NSObject, NSDate, NSNull, NSTimer, NSKeyedArchiver, NSKeyedUnarchiver, NSProcessInfo, NSString
-from MultipeerConnectivity import MCSession, MCEncryptionNone, MCSessionSendDataReliable
-from MultipeerConnectivity import MCSessionStateConnected, MCSessionStateNotConnected
-from MultipeerConnectivity import MCNearbyServiceAdvertiser
+from Foundation import NSObject, NSDate, NSNull, NSKeyedArchiver, NSKeyedUnarchiver, NSProcessInfo, NSString
 
 from . import clock as vclock
 from . import log as qsolog
 from . import protocol
-from .objects import PeerInformation, TransientQso, Activity, PeerContestInfo, allowed_classes
-
-MCNearbyServiceAdvertiserDelegate = objc.protocolNamed('MCNearbyServiceAdvertiserDelegate')
-MCSessionDelegate = objc.protocolNamed('MCSessionDelegate')
+from .objects import PeerInformation, Activity, allowed_classes, foundation
 
 
 def station_name():
@@ -64,33 +58,33 @@ def station_name():
     return host
 
 
-class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdvertiserDelegate]):
+def _is_dictionary(value):
+    return isinstance(value, dict) or hasattr(value, 'objectForKey_')
+
+
+class SkookumNetPeer(NSObject):
     """Receives SkookumNet traffic and reports QSO changes to a listener."""
 
-    def initWithSession_peerID_listener_(self, session, peerID, listener):
-        """Wire up the peer. The listener receives the QSO and session callbacks."""
+    def initWithStation_listener_(self, station, listener):
+        """Set the peer up. The listener receives the QSO and session callbacks; the transport
+        that carries the packets is attached afterwards."""
         self = objc.super(SkookumNetPeer, self).init()
         if self is None:
             return None
 
-        self.session = session
-        self.peerID = peerID
+        self.transport = None
         self.listener = listener
         # Announce ourselves under our own peer name, not the machine's station name. This bridge
         # normally runs on the same Mac as SkookumLogger, which derives its station name from the
         # host name -- taking that name too would collide with it in the peer table and in every
         # vector clock on the network.
-        self.station = str(peerID.displayName())
+        self.station = station
         self.contest = None
         self.epoch = None
         self.log = qsolog.QsoLog()
         self.classes = allowed_classes()
-        self.timer = None
-        self.dialect = None
-        self.asked_for_legacy_log = False
         self.last_peer_info = {}
         self.known_stations = set()
-        self.invited_on = None
         self.listen_only = False
         self.dump_peer_info = False
         self.dumped = set()
@@ -100,91 +94,19 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         self.hash_agreed = None
         self.binary_version = None
         self.sync_existing_log = False
-        self.last_received = None
         self.owner = None
-        self.advertiser = None
-        self.service_type = None
-        self.alone_since = None
         self.last_announce = None
+        self.in_session = False
         return self
 
     # --- outgoing ---
 
-    @objc.python_method
-    def start(self):
-        """Begin the housekeeping tick that watches over the session and the advertiser."""
-        if self.timer is None:
-            self.timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-                protocol.PEER_INFORMATION_INTERVAL, self, 'tick:', None, True)
-
-    @objc.python_method
-    def stop(self):
-        """Stop the housekeeping tick."""
-        if self.timer is not None:
-            self.timer.invalidate()
-            self.timer = None
-
-    def tick_(self, _timer):
-        """Watch for the two ways of being stuck: a dead session, and an advertisement unseen."""
-        self._check_silence()
-        self._check_alone()
-
-    @objc.python_method
-    def start_advertising(self, service_type):
-        """Advertise ourselves so SkookumLogger can find us and invite us."""
-        self.service_type = service_type
-        self.advertiser = self._make_advertiser()
-        self.advertiser.startAdvertisingPeer()
-
-    @objc.python_method
-    def stop_advertising(self):
-        """Withdraw the advertisement."""
-        if self.advertiser is not None:
-            self.advertiser.stopAdvertisingPeer()
-            self.advertiser = None
-
-    @objc.python_method
-    def _make_advertiser(self):
-        """Create a fresh advertiser for our peer, delegated to us."""
-        advertiser = MCNearbyServiceAdvertiser.alloc().initWithPeer_discoveryInfo_serviceType_(
-            self.peerID, None, self.service_type)
-        advertiser.setDelegate_(self)
-        return advertiser
-
-    @objc.python_method
-    def _check_alone(self):
-        """Advertise afresh when nobody has connected for a while.
-
-        A browser that has been running for a long time on the other side can stop seeing
-        advertisements that a freshly started one sees fine -- the subscription stalls somewhere
-        in the OS, and no amount of patience fixes it. A brand-new advertisement is seen as a new
-        discovery even by a stalled browser, so recreating the advertiser is the whole cure, and
-        it repeats for as long as nobody connects because the invitation can take minutes to come.
-        """
-        if self.advertiser is None:
-            return
-        if self.session.connectedPeers():
-            self.alone_since = None
-            return
-        now = time.monotonic()
-        if self.alone_since is None:
-            self.alone_since = now
-            return
-        if now - self.alone_since < protocol.READVERTISE_TIMEOUT:
-            return
-        logging.warning("Nobody has connected for %.0f seconds; advertising afresh in case "
-                        "the old advertisement has gone unseen", now - self.alone_since)
-        self.advertiser.stopAdvertisingPeer()
-        self.advertiser = self._make_advertiser()
-        self.advertiser.startAdvertisingPeer()
-        self.alone_since = now
-
     def announce_(self, _timer):
         """Broadcast what we have seen.
 
-        Under SkookumNet-2 this doubles as the request for a fill: the clock we send tells the
-        other peers what we are missing, and they push it to us. It is the only reason a
-        listen-only peer has to transmit at all.
+        This doubles as the request for a fill: the clock we send tells the other peers what we
+        are missing, and they push it to us. It is the only reason a listen-only peer has to
+        transmit at all.
         """
         info = PeerInformation.alloc().initWithStationName_(self.station)
         # The clock names every station we know of, not just the ones we hold events from. Our own
@@ -199,8 +121,8 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         info.vectorClock = clock
         info.syncEpoch = self.epoch
 
-        # Everything below describes the contest we were invited to, echoed back from what the
-        # peers themselves advertise.
+        # Everything below describes the contest the peers are working, echoed back from what
+        # they themselves advertise.
         info.contestName = self.contest or ''
         info.contestStartTime = self.contest_start
         info.contestEndTime = self.contest_end
@@ -223,204 +145,102 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
 
     @objc.python_method
     def _send(self, tag, payload):
-        """Archive and send one packet to every connected peer, in the dialect that peer speaks.
+        """Archive and send one packet to every connected peer.
 
-        Nothing goes out before the generation is known, and a SkookumNet-2 packet always carries
-        three elements. Both rules follow from the same fact: a SkookumNet-2 peer takes the payload
-        from the third element, so a two-element packet is not something it can act on. An epoch we
-        do not have yet therefore travels as NSNull rather than as a missing element.
+        A packet always has three elements, so an epoch we do not have yet travels as NSNull
+        rather than as a missing element.
         """
-        peers = self.session.connectedPeers()
-        if not peers or self.dialect is None or self.listen_only:
+        if self.transport is None or self.listen_only:
+            return
+        peers = self.transport.peers()
+        if not peers:
             return
 
-        if self.dialect == 'sync2':
-            packet = [tag, self.epoch if self.epoch is not None else NSNull.null(), payload]
-        else:
-            packet = [tag, payload]
-
+        packet = foundation([tag, self.epoch if self.epoch is not None else NSNull.null(), payload])
         data, error = NSKeyedArchiver.archivedDataWithRootObject_requiringSecureCoding_error_(packet, True, None)
         if error is not None:
             logging.error("Could not archive packet %s: %s", tag, error)
             return
+        self.transport.send(bytes(data))
+        logging.debug("Sent tag %s to %d peer(s), epoch %s", tag, len(peers), self.epoch)
 
-        _, error = self.session.sendData_toPeers_withMode_error_(data, peers, MCSessionSendDataReliable, None)
-        if error is not None:
-            logging.error("Could not send packet %s: %s", tag, error)
-        else:
-            logging.debug("Sent tag %s to %d peer(s) as %d elements, epoch %s",
-                          tag, len(peers), len(packet), self.epoch)
+    # --- transport delegate, called on the transport's thread ---
 
     @objc.python_method
-    def _check_silence(self):
-        """Rebuild the session when connected peers have gone silent.
-
-        A peer can vanish without a disconnect event ever arriving. PeerInformation comes every
-        five seconds while a session is alive, so a long silence from a connected peer means the
-        session is dead, not idle. The advertiser is unaffected, so a fresh session gets found and
-        invited again, and the log we kept means the gap arrives as a fill.
-        """
-        if not self.session.connectedPeers():
-            self.last_received = None
-            return
-        now = time.monotonic()
-        if self.last_received is None:
-            self.last_received = now
-            return
-        quiet = now - self.last_received
-        if quiet < protocol.SILENCE_TIMEOUT:
-            return
-        logging.warning("Nothing has arrived for %.0f seconds although %d peer(s) look connected; "
-                        "rebuilding the session so we can be invited again",
-                        quiet, len(self.session.connectedPeers()))
-        self._rebuild_session()
+    def transport_connected(self, peer):
+        """Pass the news to the main thread, where all decoding and merging happens."""
+        self.pyobjc_performSelectorOnMainThread_withObject_waitUntilDone_('peerConnected:', {'peer': peer}, False)
 
     @objc.python_method
-    def _rebuild_session(self):
-        """Replace a dead session with a fresh one, telling the listener the old one is over.
-
-        The old session's delegate is detached first so its teardown cannot deliver stale
-        callbacks. Everything else -- log, epoch, dialect -- is kept: the peer and its log have
-        not changed, only the transport died under them.
-        """
-        old = self.session
-        old.setDelegate_(None)
-        old.disconnect()
-        self.session = MCSession.alloc().initWithPeer_securityIdentity_encryptionPreference_(
-            self.peerID, None, MCEncryptionNone)
-        self.session.setDelegate_(self)
-        self.last_received = None
-        self.listener.session_ended()
+    def transport_disconnected(self, peer):
+        """Pass the news to the main thread."""
+        self.pyobjc_performSelectorOnMainThread_withObject_waitUntilDone_('peerDisconnected:', {'peer': peer}, False)
 
     @objc.python_method
-    def _request_legacy_log(self):
-        """Ask a SkookumLogger 5.x peer for its whole log.
-
-        SkookumNet-2 has no equivalent and needs none: joining is enough to be sent everything.
-        """
-        packet = [protocol.LEGACY_REQUEST_ALL_QSOS, self.peerID]
-        data, error = NSKeyedArchiver.archivedDataWithRootObject_requiringSecureCoding_error_(packet, True, None)
-        if error is not None:
-            logging.error("Could not archive the log request: %s", error)
-            return
-        peers = self.session.connectedPeers()
-        self.session.sendData_toPeers_withMode_error_(data, peers, MCSessionSendDataReliable, None)
-        logging.info("Asked the 5.x peer for its log")
-
-    # --- MCNearbyServiceAdvertiser delegate ---
-
-    def advertiser_didNotStartAdvertisingPeer_(self, advertiser, error):
-        """Report a failure to advertise; without it SkookumLogger can never find us."""
-        logging.error("Advertising failed: %s", error)
-
-    def advertiser_didReceiveInvitationFromPeer_withContext_invitationHandler_(
-            self, advertiser, peerID, context, invitationHandler):
-        """Accept every invitation, taking the contest name from the first one that carries it."""
-        if context is not None and self.contest is None:
-            try:
-                self.contest = bytes(context).decode('utf-8')
-            except (UnicodeDecodeError, TypeError) as error:
-                logging.warning("Could not read the contest name from the invitation: %s", error)
-        invitationHandler(True, self.session)
-
-        # Record which advertised name the invitation actually arrived on. SkookumLogger renamed
-        # the service somewhere after 5.1 -- that release advertises skookum-network, while the
-        # last 5.x and 6.0 both use skookumnetwork -- so if a second advertiser is ever needed for
-        # the older name, this log says whether anyone is still calling on it.
-        try:
-            self.invited_on = str(advertiser.serviceType())
-        except AttributeError:
-            self.invited_on = None
-
-        logging.info("Joined %s at the invitation of %s, on _%s._tcp",
-                     self.contest or 'an unnamed contest', peerID.displayName(),
-                     self.invited_on or 'unknown')
-
-    # --- MCSession delegate ---
-
-    @objc.typedSelector(b'v@:@@q')
-    def session_peer_didChangeState_(self, session, peerID, state):
-        """Track peers joining and leaving."""
-        if state == MCSessionStateConnected:
-            self.pyobjc_performSelectorOnMainThread_withObject_waitUntilDone_(
-                'peerConnected:', {'peer': str(peerID.displayName())}, False)
-        elif state == MCSessionStateNotConnected:
-            logging.info("%s left", peerID.displayName())
-            if len(session.connectedPeers()) == 0:
-                self.pyobjc_performSelectorOnMainThread_withObject_waitUntilDone_(
-                    'lastPeerLeft:', {'peer': str(peerID.displayName())}, False)
-
-    def session_didReceiveData_fromPeer_(self, session, data, peerID):
-        """Hand the packet to the main thread, where all decoding and merging happens."""
+    def transport_received(self, peer, data):
+        """Pass the packet to the main thread."""
         self.pyobjc_performSelectorOnMainThread_withObject_waitUntilDone_(
-            'receive:', {'peer': str(peerID.displayName()), 'data': data}, False)
-
-    def session_didReceiveCertificate_fromPeer_certificateHandler_(self, session, certificate, peerID, handler):
-        """Accept peers unconditionally. SkookumNet runs unencrypted on a local network."""
-        handler(True)
-
-    def session_didReceiveStream_withName_fromPeer_(self, session, stream, streamName, peerID):
-        """SkookumNet sends no streams."""
-
-    def session_didStartReceivingResourceWithName_fromPeer_withProgress_(
-            self, session, resourceName, peerID, progress):
-        """SkookumNet sends no resources."""
-
-    def session_didFinishReceivingResourceWithName_fromPeer_atURL_withError_(
-            self, session, resourceName, peerID, localURL, error):
-        """SkookumNet sends no resources."""
+            'receive:', {'peer': peer, 'data': data}, False)
 
     # --- main-thread handlers ---
 
     def peerConnected_(self, info):
-        """Note the new peer, but say nothing until it has shown us which protocol it speaks."""
-        logging.info("%s joined; waiting to hear which protocol it speaks before transmitting", info['peer'])
-        self.last_received = time.monotonic()
-        if self.sync_existing_log and len(self.session.connectedPeers()) > 1:
+        """Note the new peer. The session starts once a PeerInformation names the contest."""
+        logging.info("%s joined; waiting for its PeerInformation", info['peer'])
+        if self.sync_existing_log and len(self.transport.peers()) > 1:
             logging.warning("More than one peer is on the network. Other operators will see this "
                             "bridge listed with their own version string in its tooltip; start with "
                             "--no-sync-existing-log if that would confuse anyone.")
-        self.listener.session_started(self.contest)
 
-    def lastPeerLeft_(self, info):
+    def peerDisconnected_(self, info):
         """Treat the departure of the last peer as the end of the session."""
-        logging.info("%s was the last peer; the session is over", info['peer'])
-        self.listener.session_ended()
+        logging.info("%s left", info['peer'])
+        if self.in_session and not self.transport.peers():
+            logging.info("%s was the last peer; the session is over", info['peer'])
+            self.in_session = False
+            self.listener.session_ended()
 
     def receive_(self, info):
         """Decode one packet and act on it."""
-        self.last_received = time.monotonic()  # any bytes at all mean the session is alive
+        peer = info['peer']
         packet, error = NSKeyedUnarchiver.unarchivedObjectOfClasses_fromData_error_(
             self.classes, info['data'], None)
-        if error is not None:
-            logging.error("Could not decode a packet from %s: %s", info['peer'], error)
+        if error is not None or packet is None:
+            logging.error("Could not decode a packet from %s (%s): %s",
+                          peer, protocol.describe_archive(bytes(info['data'])), error)
             return
-        if packet is None or len(packet) < 2:
-            logging.error("Ignoring a malformed packet from %s", info['peer'])
+        parts = protocol.split_packet(packet)
+        if parts is None:
+            logging.error("Ignoring a malformed packet from %s", peer)
+            return
+        tag, epoch, payload = parts
+
+        if tag == protocol.SERIAL_NUMBER:
+            # Serial numbers are handed out by a server of their own between loggers. SkookumLogger
+            # exempts these packets from every check below, and nothing here takes part in it.
+            logging.debug("Ignoring a serial number packet from %s", peer)
             return
 
-        self._learn_dialect(packet, info['peer'])
+        if self.dump_peer_info and peer not in self.dumped and isinstance(payload, PeerInformation):
+            self._dump_archive(info['data'], peer)
 
-        if self.dump_peer_info and info['peer'] not in self.dumped:
-            self._dump_archive(info['data'], info['peer'], packet)
-
-        tag, epoch, payload = protocol.split_packet(packet)
-        if payload is None:
-            logging.error("Ignoring a packet from %s with no payload", info['peer'])
+        if epoch is None and tag != protocol.PEER_INFORMATION:
+            # Only PeerInformation travels without an epoch; SkookumLogger drops anything else so sent
+            logging.debug("Dropping a tag %s packet from %s that carries no epoch", tag, peer)
             return
 
         # A peer that sends sync packets is the log's owner -- the one whose epoch is to be
         # followed. Learned before the epoch check so that the very packet that identifies the
         # owner is already judged by the owner's rules.
         if self._marks_owner(tag, payload):
-            self._learn_owner(info['peer'])
+            self._learn_owner(peer)
 
         # PeerInformation is exempt from the epoch check: it is what carries the epoch, so
         # dropping it would leave us permanently unable to learn the one we are missing.
-        if not isinstance(payload, PeerInformation) and not self._epoch_allows(epoch, info['peer']):
+        if tag != protocol.PEER_INFORMATION and not self._epoch_allows(epoch, peer):
             return
 
-        self._dispatch(tag, payload, info['peer'])
+        self._dispatch(tag, payload, peer)
 
     @objc.python_method
     def _marks_owner(self, tag, payload):
@@ -433,14 +253,7 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         a single QSO to its name. (Agreed with ContestPan, 2026-08-05, after first requiring QSOs
         here.)
         """
-        if isinstance(payload, TransientQso):
-            return True
-        if isinstance(payload, dict) or hasattr(payload, 'objectForKey_'):
-            return True
-        if isinstance(payload, (list, tuple)) or hasattr(payload, 'objectAtIndex_'):
-            return tag in (protocol.LEGACY_DELETE_QSOS, protocol.LEGACY_ALL_QSOS_RESPONSE,
-                           protocol.LEGACY_REPLACE_LOG)
-        return False
+        return tag == protocol.SYNC_QSO and _is_dictionary(payload)
 
     @objc.python_method
     def _learn_owner(self, peer):
@@ -450,7 +263,7 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
             self.owner = peer
 
     @objc.python_method
-    def _dump_archive(self, data, peer, packet):
+    def _dump_archive(self, data, peer):
         """Print the raw archive of the first PeerInformation a peer sends.
 
         Our decoder only reads the keys we already know about, so a field SkookumLogger added and
@@ -458,9 +271,6 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         archive itself shows every key that actually travels, which is the only way to find out
         what we are failing to send back.
         """
-        _, _, payload = protocol.split_packet(packet)
-        if not isinstance(payload, PeerInformation):
-            return
         self.dumped.add(peer)
         try:
             archive = plistlib.loads(bytes(data))
@@ -494,39 +304,6 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
                              self.log.log_hash(include_deleted=False), info.hashOfQSOs)
 
     @objc.python_method
-    def _learn_dialect(self, packet, peer):
-        """Work out which generation the network speaks, from the shape of what it sends us.
-
-        This has to be settled before we transmit anything at all, because the two generations
-        disagree about how many elements a packet has and what sits in each. We stay silent until a
-        peer has told us what it is by example.
-        """
-        dialect = 'sync2' if protocol.is_sync2_packet(packet) else 'legacy'
-        if self.dialect == dialect:
-            return
-
-        if self.dialect is not None:
-            # A different generation means a different SkookumLogger, and so a different log.
-            # Whatever we were holding belongs to the one that went away.
-            logging.warning("%s switched from the %s protocol to %s; starting over", peer, self.dialect, dialect)
-            self.epoch = None
-            self.log.clear()
-            self.listener.log_cleared()
-        else:
-            logging.info("%s speaks the %s protocol; answering in kind", peer, dialect)
-        self.dialect = dialect
-
-        if self.listen_only:
-            return
-        if dialect == 'legacy' and not self.asked_for_legacy_log:
-            self.asked_for_legacy_log = True
-            self.announce_(None)
-            self._request_legacy_log()
-        # A SkookumNet-2 peer is not announced to here: it hears from us when its
-        # PeerInformation arrives, which is all but always the first packet anyway -- see
-        # _reply for why announcements only ever travel as replies.
-
-    @objc.python_method
     def _epoch_allows(self, epoch, peer, advertised=False):
         """Decide whether a packet's epoch lets us act on it, adopting it when its source may
         change ours. `advertised` says the epoch came from a PeerInformation payload.
@@ -541,9 +318,7 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         owner is known; once one is, other peers' epochs are echoes of the past and get dropped.
         """
         if epoch is None:
-            # Either a 5.x peer, which has no epoch at all, or a 6.x peer whose log has not been
-            # initialised yet. Nothing to check against.
-            return True
+            return False  # only PeerInformation may come without one, and it is judged elsewhere
         if self.epoch is not None and self.epoch.compare_(epoch) == 0:
             return True
 
@@ -581,27 +356,24 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
 
     @objc.python_method
     def _dispatch(self, tag, payload, peer):
-        """Route a payload by its class, using the tag only where the class is ambiguous."""
-        if isinstance(payload, PeerInformation):
+        """Route a payload by its tag, checking that it is what the tag promises."""
+        if tag == protocol.PEER_INFORMATION and isinstance(payload, PeerInformation):
             self._handle_peer_information(payload, peer)
-        elif isinstance(payload, Activity):
-            logging.debug("Spot from %s: %s", peer, payload)
-        elif isinstance(payload, PeerContestInfo):
-            logging.debug("Contest settings from %s, ignored", peer)
-        elif isinstance(payload, TransientQso):
-            self._handle_legacy_qso(tag, payload)
-        elif isinstance(payload, dict) or hasattr(payload, 'objectForKey_'):
+        elif tag == protocol.SYNC_QSO and _is_dictionary(payload):
             self._handle_sync(payload, peer)
-        elif isinstance(payload, (list, tuple)) or hasattr(payload, 'objectAtIndex_'):
-            self._handle_legacy_qso_list(tag, payload)
-        elif isinstance(payload, str):
+        elif tag in (protocol.ADD_ACTIVITY, protocol.CHANGE_ACTIVITY, protocol.DELETE_ACTIVITY) \
+                and isinstance(payload, Activity):
+            logging.debug("Spot from %s: %s", peer, payload)
+        elif tag == protocol.GAB and isinstance(payload, str):
             logging.info("Message from %s: %s", peer, payload)
+        elif tag == protocol.PARTNER_PROMPT:
+            logging.debug("Partner prompt from %s: %s", peer, payload)
         else:
-            logging.debug("Ignoring a %s payload from %s", type(payload).__name__, peer)
+            logging.debug("Ignoring a %s payload under tag %s from %s", type(payload).__name__, tag, peer)
 
     @objc.python_method
     def _handle_peer_information(self, info, peer):
-        """Record what a peer knows, and work out which generation it belongs to."""
+        """Record what a peer knows, and answer it."""
         if str(info) != self.last_peer_info.get(peer):
             logging.info("%s", info)
             self.last_peer_info[peer] = str(info)
@@ -624,15 +396,8 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         # Deliberately not folded into our own clock. A peer's broadcast says what *it* has, and
         # claiming those events as ours would tell it we are up to date -- so it would send us
         # nothing, forever. Our clock advances only when QSOs actually arrive.
-        if info.binaryVersion and self.peer_version != str(info.binaryVersion):
-            self.peer_version = str(info.binaryVersion)
-            logging.info("%s is running %s", peer, self.peer_version)
-        if info.contestStartTime is not None:
-            self.contest_start = info.contestStartTime
-        if info.contestEndTime is not None:
-            self.contest_end = info.contestEndTime
-        if info.contestName and not self.contest:
-            self.contest = str(info.contestName)
+        if self.owner is None or peer == self.owner:
+            self._echo_from(info, peer)
 
         self._compare_log_hash(info, peer)
 
@@ -648,6 +413,34 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
 
         self.listener.peer_information(info)
         self._reply(peer)
+
+    @objc.python_method
+    def _echo_from(self, info, peer):
+        """Take on what we echo back -- the build, the contest and its times -- from this peer,
+        and start the session once we know which contest it is about.
+
+        SkookumLogger shares the log only with a peer that names its own build and contest, so
+        these come from the owner once one is known and from anyone until then: a passive peer
+        that names itself honestly would otherwise talk us into a mismatch. The contest name
+        arrives here and nowhere else, so the session begins -- or begins again, under a new
+        name -- only now.
+        """
+        if info.binaryVersion and self.peer_version != str(info.binaryVersion):
+            self.peer_version = str(info.binaryVersion)
+            logging.info("%s is running %s", peer, self.peer_version)
+        if info.contestStartTime is not None:
+            self.contest_start = info.contestStartTime
+        if info.contestEndTime is not None:
+            self.contest_end = info.contestEndTime
+
+        contest = str(info.contestName) if info.contestName else None
+        if contest and contest != self.contest:
+            logging.info("%s is working %s", peer, contest)
+            self.contest = contest
+            self.in_session = False
+        if not self.in_session:
+            self.in_session = True
+            self.listener.session_started(self.contest)
 
     @objc.python_method
     def _reply(self, peer):
@@ -671,7 +464,7 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
 
     @objc.python_method
     def _handle_sync(self, payload, peer):
-        """Apply a SkookumNet-2 sync packet: some QSOs, maybe contest settings, maybe a clock."""
+        """Apply a sync packet: some QSOs, maybe contest settings, maybe a clock."""
         qsos = payload.get(protocol.SYNC_QSOS) if hasattr(payload, 'get') else payload[protocol.SYNC_QSOS]
         sender_clock = payload.get(protocol.SYNC_CLOCK) if hasattr(payload, 'get') else None
 
@@ -685,35 +478,6 @@ class SkookumNetPeer(NSObject, protocols=[MCSessionDelegate, MCNearbyServiceAdve
         for qso in qsos:
             outcome = self.log.merge_qso(qso)
             self._report(outcome, qso)
-
-    @objc.python_method
-    def _handle_legacy_qso(self, tag, qso):
-        """Apply a 5.x add or change, where the tag names the operation."""
-        if tag == protocol.LEGACY_ADD_QSO:
-            self._report(self.log.legacy_add(qso), qso)
-        elif tag == protocol.LEGACY_CHANGE_QSO:
-            self.log.legacy_add(qso)
-            self._report(qsolog.UPDATED, qso)
-        else:
-            logging.debug("Ignoring a QSO carried by tag %s", tag)
-
-    @objc.python_method
-    def _handle_legacy_qso_list(self, tag, qsos):
-        """Apply a 5.x packet carrying several QSOs at once."""
-        if tag == protocol.LEGACY_DELETE_QSOS:
-            for qso in qsos:
-                self._report(self.log.legacy_delete(qso), qso)
-            return
-
-        if tag in (protocol.LEGACY_ALL_QSOS_RESPONSE, protocol.LEGACY_REPLACE_LOG):
-            logging.info("Replacing the log with %d QSO(s)", len(qsos))
-            self.log.clear()
-            self.listener.log_cleared()
-            for qso in qsos:
-                self._report(self.log.legacy_add(qso), qso)
-            return
-
-        logging.debug("Ignoring a list carried by tag %s", tag)
 
     @objc.python_method
     def _report(self, outcome, qso):

@@ -4,9 +4,9 @@
 Run this alongside SkookumLogger, join SkookumNet in SkookumLogger, and open the analyser page.
 QSOs then appear in the page as they are logged.
 
-This is a listening peer. It advertises itself so SkookumLogger can invite it and broadcasts its
-own state so it takes part in the sync properly, but it never sends anything that could change
-another station's log.
+This is a listening peer. It finds SkookumLogger on the network and connects to it, and
+broadcasts its own state so it takes part in the sync properly, but it never sends anything that
+could change another station's log.
 """
 import argparse
 import logging
@@ -14,12 +14,12 @@ import os
 import sys
 
 from PyObjCTools import AppHelper
-from MultipeerConnectivity import MCSession, MCPeerID, MCEncryptionNone
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 
 from snet import protocol                                    # noqa: E402  pylint: disable=wrong-import-position
 from snet.session import SkookumNetPeer                      # noqa: E402  pylint: disable=wrong-import-position
+from snet.transport import Transport                         # noqa: E402  pylint: disable=wrong-import-position
 from snet.webbridge import WebBridge, DEFAULT_HOST, DEFAULT_PORT, issue_token  # noqa: E402  pylint: disable=wrong-import-position
 
 DEFAULT_LOG = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bichok-bridge.log')
@@ -46,9 +46,9 @@ def parse_arguments():
     parser.add_argument('--host', default=DEFAULT_HOST, help='address to serve the browser on')
     parser.add_argument('--port', type=int, default=DEFAULT_PORT, help='port to serve the browser on')
     parser.add_argument('--service', default=protocol.SERVICE_TYPE,
-                        help='Bonjour service type to advertise (both the final 5.x release and 6.0 use the default)')
+                        help=f'Bonjour service type to advertise and look for (default: {protocol.SERVICE_TYPE})')
     parser.add_argument('--listen-only', action='store_true',
-                        help='never transmit anything, so nothing this bridge does can upset SkookumLogger')
+                        help='never send a packet, so nothing this bridge does can upset SkookumLogger')
     parser.add_argument('--binary-version', default=BRIDGE_VERSION, metavar='NAME',
                         help='how this client identifies itself to peers (see README)')
     parser.add_argument('--sync-existing-log', dest='sync_existing_log', action='store_true', default=True,
@@ -77,15 +77,12 @@ def main():
     configure_logging(arguments)
 
     name = arguments.name
-    logging.info("Joining SkookumNet as %s, advertising _%s._tcp", name, arguments.service)
+    logging.info("Joining SkookumNet as %s on %s", name, arguments.service)
 
     bridge = WebBridge(arguments.host, arguments.port, issue_token(PAGE_FOLDER))
     bridge.start()
 
-    peerID = MCPeerID.alloc().initWithDisplayName_(name)
-    session = MCSession.alloc().initWithPeer_securityIdentity_encryptionPreference_(
-        peerID, None, MCEncryptionNone)
-    peer = SkookumNetPeer.alloc().initWithSession_peerID_listener_(session, peerID, bridge)
+    peer = SkookumNetPeer.alloc().initWithStation_listener_(name, bridge)
     peer.listen_only = arguments.listen_only
     peer.dump_peer_info = arguments.dump_peer_info
     peer.binary_version = arguments.binary_version
@@ -93,22 +90,17 @@ def main():
     if not arguments.sync_existing_log:
         logging.info("Not fetching the log from before startup; only QSOs logged from now on will arrive.")
     if arguments.listen_only:
-        logging.warning("Listening only: nothing will be transmitted, so this bridge will not appear "
-                        "in SkookumLogger's peer table and a 5.x peer will not be asked for its log")
-    session.setDelegate_(peer)
+        logging.warning("Listening only: no packet will be sent, so this bridge will not appear "
+                        "in SkookumLogger's peer table and the log from before startup will not arrive")
 
-    # The peer owns its advertiser: when nobody connects for long enough it replaces the
-    # advertisement, which is the cure for a discovery that has stalled on the other side.
-    peer.start_advertising(arguments.service)
-    peer.start()
+    transport = Transport(name, peer, service_type=arguments.service)
+    peer.transport = transport
+    transport.start()
 
     try:
         AppHelper.runConsoleEventLoop(installInterrupt=True)
     finally:
-        peer.stop()
-        peer.stop_advertising()
-        # Through peer, not a local variable: the silence watchdog may have replaced the session.
-        peer.session.disconnect()
+        transport.stop()
         bridge.stop()
         logging.info("Left SkookumNet")
 

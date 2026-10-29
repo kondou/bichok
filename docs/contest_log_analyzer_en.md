@@ -557,8 +557,8 @@ Receive and display SkookumLogger's QSOs in real time. The **SkookumNet bridge**
 
 ### Prerequisites
 
-- **macOS** — required for this feature alone, because the bridge uses macOS Multipeer Connectivity.
-- SkookumLogger must be running.
+- **macOS** — required for this feature alone, because the bridge relies on a macOS facility.
+- **SkookumLogger 6.1(16) or later** must be running. (With an earlier SkookumLogger, use BicHok 1.0.18.)
 - The SkookumNet bridge must be running (→ [Starting the bridge](#starting-the-bridge)).
 - The bridge must be on the same Layer-2 network as SkookumLogger. Running both on the same Mac is the simplest arrangement.
 - `uv` must be installed. If it is not, the launcher prints the install command.
@@ -579,7 +579,7 @@ To start it from the command line instead:
 
 ```bash
 uv run --no-project --python 3.13 \
-  --with pyobjc-framework-MultipeerConnectivity --with websockets \
+  --with pyobjc-framework-Cocoa --with websockets \
   python bridge/bichok_bridge.py
 ```
 
@@ -599,7 +599,7 @@ The main options (any argument given to the launcher is passed straight through 
 2. **When you start using a new log, press the Reset button once.** This issues an epoch marking the generation of the log. Only SkookumLogger can issue one; the bridge follows whichever epoch it observes.
 3. Click **Join**. Until you do, SkookumLogger advertises nothing and the bridge cannot see it.
 
-The bridge appears in the peer table as `BicHok`. It can be invited by several SkookumLoggers at the same time.
+The bridge finds SkookumLogger and connects to it by itself, and appears in the peer table as `BicHok`. It can be connected to several SkookumLoggers at the same time.
 
 ### Connecting from the browser
 
@@ -773,10 +773,12 @@ Both the main chart and panes support zoom and pan.
 - Is a firewall or security software blocking port 2237?
 
 ### The bridge connects but no QSOs arrive
-- Is SkookumLogger running?
+- Is SkookumLogger running, and is it 6.1(16) or later?
 - Did you click **Join** in SkookumLogger's **SkookumNet** window? Until you do, SkookumLogger advertises nothing.
 - Did you press **Reset** once for a new log?
 - Are the bridge and SkookumLogger on the same Layer-2 network?
+- In macOS **System Settings › Privacy & Security › Local Network**, is the app you started the bridge from (Terminal, for instance) allowed? If it is not, the bridge's log says `local network access was denied`.
+- Is another station on the network also called `BicHok`? The bridge's log warns about it; start the bridge with `--name` and a different name.
 - Check `bridge/bichok-bridge.log` for details; starting the bridge with `--debug` records every packet.
 
 ### File will not load
@@ -825,7 +827,7 @@ When the Pane View is active, a **▲ Hide** button appears at the bottom-left o
 
 ## License
 
-BicHok version 1.0.18  
+BicHok version 1.1.0  
 Copyright © 2026 kondou  
 Released under the MIT License.
 

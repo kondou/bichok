@@ -35,7 +35,7 @@ QSO 数とレート、そのトレンド、バンド別の内訳、そしてロ�
 - モダンブラウザ（Chrome / Chromium、Safari、Firefox、Edge）
 - 他には何も要らない。ページはファイルのまま動作するので、サーバー・Python・
   インストール作業はいずれも不要
-- ライブ受信を使う場合のみ: macOS、SkookumLogger、そして
+- ライブ受信を使う場合のみ: macOS、SkookumLogger 6.1(16) 以降、そして
   [uv](https://docs.astral.sh/uv/)（未導入ならランチャーがインストールコマンドを表示）
 
 | 環境 | ログファイルの分析 | SkookumNet ライブ接続 |
