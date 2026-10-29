@@ -38,7 +38,7 @@ from Foundation import NSObject, NSDate, NSNull, NSKeyedArchiver, NSKeyedUnarchi
 from . import clock as vclock
 from . import log as qsolog
 from . import protocol
-from .objects import PeerInformation, Activity, allowed_classes, foundation
+from .objects import PeerInformation, Activity, allowed_classes, archivable
 
 
 def station_name():
@@ -156,7 +156,7 @@ class SkookumNetPeer(NSObject):
         if not peers:
             return
 
-        packet = foundation([tag, self.epoch if self.epoch is not None else NSNull.null(), payload])
+        packet = archivable([tag, self.epoch if self.epoch is not None else NSNull.null(), payload])
         data, error = NSKeyedArchiver.archivedDataWithRootObject_requiringSecureCoding_error_(packet, True, None)
         if error is not None:
             logging.error("Could not archive packet %s: %s", tag, error)
@@ -207,7 +207,7 @@ class SkookumNetPeer(NSObject):
             self.classes, info['data'], None)
         if error is not None or packet is None:
             logging.error("Could not decode a packet from %s (%s): %s",
-                          peer, protocol.describe_archive(bytes(info['data'])), error)
+                          peer, protocol.peek_packet(bytes(info['data'])), error)
             return
         parts = protocol.split_packet(packet)
         if parts is None:

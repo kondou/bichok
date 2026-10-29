@@ -152,7 +152,7 @@ def split_packet(packet):
     return int(tag), epoch, payload
 
 
-def describe_archive(data):
+def peek_packet(data):
     """Say what a packet that would not unarchive contained: its tag and the classes it names.
 
     The archive is read as a plain property list, so none of the objects in it are created --

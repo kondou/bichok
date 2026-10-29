@@ -29,7 +29,7 @@ EXCHANGE_FIELDS = ('call', 'check', 'clubName', 'clubStatus', 'grid', 'info',
 _UNSIGNED_FROM = 0x8000000000000000
 
 
-def foundation(value):
+def archivable(value):
     """Turn Python values into Foundation objects, all the way down, ready to be archived.
 
     Handed to the archiver as they are, Python strings, dicts and lists are recorded under PyObjC's
@@ -52,12 +52,12 @@ def foundation(value):
     if isinstance(value, dict):
         converted = NSMutableDictionary.dictionary()
         for key, item in value.items():
-            converted.setObject_forKey_(foundation(item), foundation(key))
+            converted.setObject_forKey_(archivable(item), archivable(key))
         return converted
     if isinstance(value, (list, tuple)):
         converted = NSMutableArray.array()
         for item in value:
-            converted.addObject_(foundation(item))
+            converted.addObject_(archivable(item))
         return converted
     return value
 
@@ -375,22 +375,22 @@ class PeerInformation(NSObject, protocols=[NSSecureCoding]):
 
     def encodeWithCoder_(self, coder):
         """Write every field, as the Foundation objects SkookumLogger itself sends."""
-        coder.encodeObject_forKey_(foundation(self.peerHostName), 'peerHostName')
+        coder.encodeObject_forKey_(archivable(self.peerHostName), 'peerHostName')
         coder.encodeInteger_forKey_(self.operatingMode, 'operatingMode')
         coder.encodeInteger_forKey_(self.keyboardFocus, 'keyboardFocus')
         coder.encodeInteger_forKey_(self.transmitFocus, 'transmitFocus')
         coder.encodeInteger_forKey_(self.runReceiveFrequency, 'runReceiveFrequency')
         coder.encodeInteger_forKey_(self.runTransmitFrequency, 'runTransmitFrequency')
-        coder.encodeObject_forKey_(foundation(self.runMode), 'runMode')
+        coder.encodeObject_forKey_(archivable(self.runMode), 'runMode')
         coder.encodeInteger_forKey_(self.pounceReceiveFrequency, 'pounceReceiveFrequency')
         coder.encodeInteger_forKey_(self.pounceTransmitFrequency, 'pounceTransmitFrequency')
-        coder.encodeObject_forKey_(foundation(self.pounceMode), 'pounceMode')
-        coder.encodeObject_forKey_(foundation(self.lastTenRate), 'lastTenRate')
-        coder.encodeObject_forKey_(foundation(self.lastTenQsoPointRate), 'lastTenQsoPointRate')
-        coder.encodeObject_forKey_(foundation(self.vectorClock), 'vectorClock')
+        coder.encodeObject_forKey_(archivable(self.pounceMode), 'pounceMode')
+        coder.encodeObject_forKey_(archivable(self.lastTenRate), 'lastTenRate')
+        coder.encodeObject_forKey_(archivable(self.lastTenQsoPointRate), 'lastTenQsoPointRate')
+        coder.encodeObject_forKey_(archivable(self.vectorClock), 'vectorClock')
         coder.encodeObject_forKey_(self.syncEpoch, 'syncEpoch')
-        coder.encodeObject_forKey_(foundation(self.binaryVersion), 'binaryVersion')
-        coder.encodeObject_forKey_(foundation(self.contestName), 'contestName')
+        coder.encodeObject_forKey_(archivable(self.binaryVersion), 'binaryVersion')
+        coder.encodeObject_forKey_(archivable(self.contestName), 'contestName')
         coder.encodeObject_forKey_(self.contestStartTime, 'contestStartTime')
         coder.encodeObject_forKey_(self.contestEndTime, 'contestEndTime')
         coder.encodeObject_forKey_(self.timestamp, 'timestamp')

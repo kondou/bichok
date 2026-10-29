@@ -363,10 +363,10 @@ def build_peer(connected):
 def archived(packet):
     """Archive a packet the way a peer would send it."""
     from Foundation import NSKeyedArchiver  # pylint: disable=import-outside-toplevel
-    from snet.objects import foundation  # pylint: disable=import-outside-toplevel
+    from snet.objects import archivable  # pylint: disable=import-outside-toplevel
 
     data, error = NSKeyedArchiver.archivedDataWithRootObject_requiringSecureCoding_error_(
-        foundation(packet), True, None)
+        archivable(packet), True, None)
     assert error is None, error
     return bytes(data)
 
@@ -715,8 +715,8 @@ def test_conflict_info_decodes():
         made.notes = ''
         made.flags = 0
         made.sequenceID = 1
-        made.vectorClock = objects.foundation({'SL': 1})
-        made.conflictInfo = objects.foundation(conflict)
+        made.vectorClock = objects.archivable({'SL': 1})
+        made.conflictInfo = objects.archivable(conflict)
         made.lastModifiedBy = 'SL'
         return made
 
