@@ -26,6 +26,8 @@ DEFAULT_PORT = 2237
 
 TOKEN_FILE = 'bridge_token.js'
 
+STOP_TIMEOUT = 3  # seconds to see the browsers off; one that does not answer is not waited for
+
 _BANDS = (
     (1800, 2000, '160'), (3500, 4000, '80'), (5250, 5450, '60'), (7000, 7300, '40'),
     (10100, 10150, '30'), (14000, 14350, '20'), (18068, 18168, '17'), (21000, 21450, '15'),
@@ -124,6 +126,7 @@ class WebBridge:
         self.clients = set()
         self.cache = {}
         self.loop = None
+        self.task = None
         self.thread = None
 
     # --- lifecycle ---
@@ -138,9 +141,10 @@ class WebBridge:
             self.thread.start()
 
     def stop(self):
-        """Stop serving."""
+        """Stop serving, and wait for the thread: as a daemon it would otherwise still be logging as Python exits."""
         if self.loop is not None and self.loop.is_running():
-            self.loop.call_soon_threadsafe(self.loop.stop)
+            self.loop.call_soon_threadsafe(self.task.cancel)
+            self.thread.join(STOP_TIMEOUT)
 
     # --- SkookumNet callbacks ---
 
@@ -267,8 +271,6 @@ class WebBridge:
                         logging.info("Serving the log on ws://%s:%d", self.host, self.port)
                         delay = 2
                         await asyncio.Future()
-                except asyncio.CancelledError:
-                    break
                 except OSError as error:
                     logging.warning("Could not bind ws://%s:%d (%s); retrying in %ds",
                                     self.host, self.port, error, delay)
@@ -278,7 +280,10 @@ class WebBridge:
                     logging.error("The browser bridge stopped: %s", error)
                     break
 
+        self.task = self.loop.create_task(serve())
         try:
-            self.loop.run_until_complete(serve())
+            self.loop.run_until_complete(self.task)
+        except asyncio.CancelledError:
+            pass  # stop() asked for this
         except Exception as error:  # pylint: disable=broad-except
             logging.error("The browser bridge event loop failed: %s", error)

@@ -595,10 +595,10 @@ uv run --no-project --python 3.13 \
 ### SkookumLogger 側の操作
 
 1. SkookumLogger の **SkookumNet** ウィンドウを開く
-2. **新しいログを使い始めたときは、一度 Reset ボタンを押す。** ログの世代を示すエポックが発行される。エポックを発行できるのは SkookumLogger だけで、ブリッジは観測したエポックに従う
-3. **Join** をクリックする。Join するまで SkookumLogger は何も広告せず、ブリッジからは見えない
+2. **Join** をクリックする。Join するまで SkookumLogger は何も広告せず、ブリッジからは見えない
+3. **新しいログを使い始めたときは、SkookumNet ウィンドウ右上の ◁ ボタンを一度押す。** ログの世代を示すエポックが発行される。エポックを発行できるのは SkookumLogger だけで、ブリッジは観測したエポックに従う
 
-ブリッジは SkookumLogger を自動で見つけて接続し、`BicHok` という名前でピア表に現れる。複数の SkookumLogger と同時につながることもできる。
+ブリッジは SkookumLogger を自動で見つけて接続し、`BicHok` という名前でピア表に現れる。
 
 ### ブラウザ側の接続手順
 
@@ -774,7 +774,7 @@ X 軸起点
 ### ブリッジには接続できるが QSO が届かない
 - SkookumLogger が起動しているか。6.1(16) 以降か
 - SkookumLogger の **SkookumNet** ウィンドウで **Join** を実行したか。Join するまで SkookumLogger は何も広告しない
-- 新しいログで一度 **Reset** ボタンを押したか
+- 新しいログで一度 SkookumNet ウィンドウ右上の **◁** ボタンを押したか
 - ブリッジと SkookumLogger が同じ L2 ネットワーク上にあるか
 - macOS の **システム設定 › プライバシーとセキュリティ › ローカルネットワーク** で、ブリッジを起動したアプリ（ターミナル等）が許可されているか。拒否されているとブリッジのログに `local network access was denied` と出る
 - 同じネットワークに `BicHok` という名前の局がもう一つないか（ブリッジのログに警告が出る）。ある場合は `--name` で別の名前を付けて起動する
@@ -827,7 +827,7 @@ iPhone（Safari）等で利用可能。縦・横いずれの向きでも動作�
 
 ## ライセンス
 
-BicHok version 1.1.0  
+BicHok version 1.1.1  
 Copyright © 2026 kondou  
 MIT License にて公開。
 

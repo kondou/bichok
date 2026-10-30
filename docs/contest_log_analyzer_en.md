@@ -596,10 +596,10 @@ The main options (any argument given to the launcher is passed straight through 
 ### On the SkookumLogger side
 
 1. Open SkookumLogger's **SkookumNet** window.
-2. **When you start using a new log, press the Reset button once.** This issues an epoch marking the generation of the log. Only SkookumLogger can issue one; the bridge follows whichever epoch it observes.
-3. Click **Join**. Until you do, SkookumLogger advertises nothing and the bridge cannot see it.
+2. Click **Join**. Until you do, SkookumLogger advertises nothing and the bridge cannot see it.
+3. **When you start using a new log, press the ◁ button at the top right of the SkookumNet window once.** This issues an epoch marking the generation of the log. Only SkookumLogger can issue one; the bridge follows whichever epoch it observes.
 
-The bridge finds SkookumLogger and connects to it by itself, and appears in the peer table as `BicHok`. It can be connected to several SkookumLoggers at the same time.
+The bridge finds SkookumLogger and connects to it by itself, and appears in the peer table as `BicHok`.
 
 ### Connecting from the browser
 
@@ -775,7 +775,7 @@ Both the main chart and panes support zoom and pan.
 ### The bridge connects but no QSOs arrive
 - Is SkookumLogger running, and is it 6.1(16) or later?
 - Did you click **Join** in SkookumLogger's **SkookumNet** window? Until you do, SkookumLogger advertises nothing.
-- Did you press **Reset** once for a new log?
+- Did you press the **◁** button at the top right of the SkookumNet window once for a new log?
 - Are the bridge and SkookumLogger on the same Layer-2 network?
 - In macOS **System Settings › Privacy & Security › Local Network**, is the app you started the bridge from (Terminal, for instance) allowed? If it is not, the bridge's log says `local network access was denied`.
 - Is another station on the network also called `BicHok`? The bridge's log warns about it; start the bridge with `--name` and a different name.
@@ -827,7 +827,7 @@ When the Pane View is active, a **▲ Hide** button appears at the bottom-left o
 
 ## License
 
-BicHok version 1.1.0  
+BicHok version 1.1.1  
 Copyright © 2026 kondou  
 Released under the MIT License.
 

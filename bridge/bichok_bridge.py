@@ -90,8 +90,7 @@ def main():
     if not arguments.sync_existing_log:
         logging.info("Not fetching the log from before startup; only QSOs logged from now on will arrive.")
     if arguments.listen_only:
-        logging.warning("Listening only: no packet will be sent, so this bridge will not appear "
-                        "in SkookumLogger's peer table and the log from before startup will not arrive")
+        logging.warning("Listening only: no packet will be sent, so the log from before startup will not arrive")
 
     transport = Transport(name, peer, service_type=arguments.service)
     peer.transport = transport

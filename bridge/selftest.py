@@ -1050,6 +1050,69 @@ def test_browser_token():
     check('a bridge given no token admits anyone', webbridge.WebBridge().admits('/'), True)
 
 
+def test_browser_bridge_stops():
+    """Stopping is part of every normal exit, so it must not read as a failure in the log, and the
+    server's thread must be done by the time Python starts to exit. Waiting to retry a busy port is
+    the awkward moment: the request to stop arrives inside an except clause."""
+    print('stopping the browser bridge')
+    if webbridge.websockets is None:
+        print('  skip  the websockets package is missing')
+        return
+    from websockets.sync.client import connect  # pylint: disable=import-outside-toplevel
+    records = []
+    escaped = []
+    browsers = []
+
+    class Capture(logging.Handler):
+        """Keeps what the bridge logs."""
+        def emit(self, record):
+            records.append((record.levelno, record.getMessage()))
+
+    def attach(port):
+        try:
+            browsers.append(connect(f'ws://127.0.0.1:{port}/'))
+        except OSError:
+            return False
+        return True
+
+    capture = Capture()
+    root = logging.getLogger()
+    root.addHandler(capture)
+    hook = threading.excepthook
+    threading.excepthook = lambda arguments: escaped.append(arguments.exc_type.__name__)
+    try:
+        spare = socket.socket()
+        spare.bind(('127.0.0.1', 0))
+        port = spare.getsockname()[1]
+        spare.close()  # free again, for the bridge to take
+        serving = webbridge.WebBridge('127.0.0.1', port)
+        serving.start()
+        check('a browser connects', _wait_for(lambda: attach(port)), True)
+        check('and is attached', _wait_for(lambda: len(serving.clients) == 1), True)
+        serving.stop()
+        check('stopping ends the server thread', serving.thread.is_alive(), False)
+        check('and sees the browser off', serving.clients, set())
+
+        with socket.socket() as squatter:
+            squatter.bind(('127.0.0.1', 0))
+            squatter.listen()
+            waiting = webbridge.WebBridge('127.0.0.1', squatter.getsockname()[1])
+            waiting.start()
+            check('a busy port is waited on',
+                  _wait_for(lambda: any('Could not bind' in message for _, message in records)), True)
+            waiting.stop()
+            check('stopping during that wait ends the thread too', waiting.thread.is_alive(), False)
+
+        check('nothing is logged as an error',
+              [message for level, message in records if level >= logging.ERROR], [])
+        check('and nothing escapes the thread', escaped, [])
+    finally:
+        for browser in browsers:
+            browser.close()
+        threading.excepthook = hook
+        root.removeHandler(capture)
+
+
 def main():
     """Run every check and report."""
     for test in (test_clock_relationships, test_example_one, test_example_three,
@@ -1062,7 +1125,7 @@ def main():
                  test_epochless_packets, test_conflict_info_decodes, test_sent_archive_is_foundation,
                  test_session_start, test_restart_replays, test_transport_loopback,
                  test_transport_duplicates, test_transport_guards, test_transport_unreachable,
-                 test_browser_token):
+                 test_browser_token, test_browser_bridge_stops):
         test()
 
     print()

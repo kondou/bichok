@@ -86,7 +86,7 @@ hash SkookumLogger compares peers with, so once the log has arrived, SkookumLogg
 bridge as a peer in good standing — a white row, no warnings. What remains:
 
 * SkookumLogger records this bridge in its log's vector clock, as an entry at zero. It affects
-  nothing and the reset button in the SkookumNet window clears it.
+  nothing and the ◁ button at the top right of the SkookumNet window clears it.
 * The Station column reads BicHok throughout. Only the hidden version field, visible in the row's
   tooltip, carries the peer's identifier.
 
@@ -97,9 +97,9 @@ order.
 
 ## Epochs
 
-An epoch marks a generation of the log. Only SkookumLogger creates one, through the reset button
-in its SkookumNet window, and that is needed once per log. The bridge never invents an epoch: it
-adopts what it observes and echoes that back.
+An epoch marks a generation of the log. Only SkookumLogger creates one, through the ◁ button at the
+top right of its SkookumNet window, and that is needed once per log. The bridge never invents an
+epoch: it adopts what it observes and echoes that back.
 
 Whose observation counts is the fine print. The epoch follows the log's *owner* — the peer that
 sends sync packets, which only a logger ever does, QSOs aboard or not — and follows it in both
