@@ -741,6 +741,93 @@ def test_conflict_info_decodes():
             check(f'and the QSO with {label} still hashes', qsos[0].qso_hash() > 0, True)
 
 
+def test_qso_hash_by_version():
+    """SkookumLogger 6.1(19) hashes a QSO over two more fields than earlier versions --
+    transmitFrequency after subReceiveFrequency, and its new transmitterNumber at the end -- and
+    whether the archive carries transmitterNumber, which 6.1(19) writes even when nil, says which
+    hash applies. The field order here is spelled out independently of objects.py."""
+    print('QSO hash by SkookumLogger version')
+    from Foundation import NSDate, NSKeyedUnarchiver, NSNumber, NSUUID  # pylint: disable=import-outside-toplevel
+    from snet import objects  # pylint: disable=import-outside-toplevel
+
+    mask = 0xFFFFFFFFFFFFFFFF
+    field = objects._field_hash  # pylint: disable=protected-access
+
+    def exchange(call):
+        made = objects.Exchange.alloc().init()
+        for name in objects.EXCHANGE_FIELDS:
+            setattr(made, name, '')
+        made.call = call
+        return made
+
+    def qso(carries, number=None, flags=1):
+        made = objects.TransientQso.alloc().init()
+        made.identifier = NSUUID.alloc().initWithUUIDString_('3B0C5E1A-6F0D-4C2B-9E57-1D8A4F7C2E90')
+        made.timeStamp = NSDate.dateWithTimeIntervalSince1970_(1763510991.25)
+        made.mainReceiveFrequency = 14002000
+        made.subReceiveFrequency = 14002000
+        made.transmitFrequency = 14002500  # unlike the receive frequencies, so leaving it out shows
+        made.mode = 'CW'
+        made.sentExchange = exchange('JH5GHM')
+        made.receivedExchange = exchange('W3KX')
+        made.operatorCall = 'JH5GHM'
+        made.stationName = 'SL'
+        made.notes = ''
+        made.flags = flags
+        made.sequenceID = 3
+        made.vectorClock = objects.archivable({'SL': 3})
+        made.conflictInfo = None
+        made.lastModifiedBy = 'SL'
+        if carries:
+            made.carries_transmitter_number = True
+            made.transmitterNumber = number
+        return made
+
+    def mixed(values):
+        result = 1
+        for value in values:
+            result = (result + 43 * ((result + value) & mask)) & mask
+        return result
+
+    def head(made):
+        return [field(made.identifier), field(made.timeStamp), field(made.mainReceiveFrequency),
+                field(made.subReceiveFrequency)]
+
+    def tail(made):
+        return [field(made.mode), made.sentExchange.exchange_as_data().hash(),
+                made.receivedExchange.exchange_as_data().hash(), field(made.operatorCall),
+                field(made.stationName), field(made.notes), field(made.flags), field(made.sequenceID),
+                field(made.vectorClock), 0, field(made.lastModifiedBy)]
+
+    older = qso(False)
+    newer = qso(True)
+    numbered = qso(True, NSNumber.numberWithInt_(2))
+    tomb = qso(True, flags=1 | protocol.FLAG_DELETED)
+    check('without transmitterNumber, the fields 6.1(17) and earlier hash',
+          older.qso_hash(), mixed(head(older) + tail(older)))
+    check('with it, transmitFrequency after subReceiveFrequency and transmitterNumber last, nil as 0',
+          newer.qso_hash(), mixed(head(newer) + [field(newer.transmitFrequency)] + tail(newer) + [0]))
+    check('so the same QSO hashes differently under the two', older.qso_hash() != newer.qso_hash(), True)
+    check('a transmitter number that is set takes part',
+          numbered.qso_hash(), mixed(head(numbered) + [field(numbered.transmitFrequency)] + tail(numbered)
+                                     + [NSNumber.numberWithInt_(2).hash()]))
+    check('a tombstone hashes the same way',
+          tomb.qso_hash(), mixed(head(tomb) + [field(tomb.transmitFrequency)] + tail(tomb) + [0]))
+
+    data = archived([protocol.SYNC_QSO, NSDate.date(), {'qsos': [older, newer, numbered, tomb]}])
+    packet, error = NSKeyedUnarchiver.unarchivedObjectOfClasses_fromData_error_(objects.allowed_classes(), data, None)
+    decoded = protocol.split_packet(packet) if error is None else None
+    qsos = list(decoded[2]['qsos']) if decoded else []
+    check('a fill mixing both shapes decodes whole', len(qsos), 4)
+    if len(qsos) == 4:
+        check('each QSO keeps its shape through the archive',
+              [qso.carries_transmitter_number for qso in qsos], [False, True, True, True])
+        check('a nil transmitter number stays nil', qsos[1].transmitterNumber, None)
+        check('a set one arrives', qsos[2].transmitterNumber, 2)
+        check('and every hash survives the trip', [qso.qso_hash() for qso in qsos],
+              [older.qso_hash(), newer.qso_hash(), numbered.qso_hash(), tomb.qso_hash()])
+
+
 def test_sent_archive_is_foundation():
     """What we send carries the Foundation classes SkookumLogger sends, not PyObjC's wrappers."""
     print('the classes we send')
@@ -1122,7 +1209,8 @@ def main():
                  test_owner_going_epochless, test_reply_announce,
                  test_duplicate_fill, test_null_epoch_packet, test_packet_shape, test_framing,
                  test_hello, test_who_connects, test_duplicate_choice, test_serial_number_ignored,
-                 test_epochless_packets, test_conflict_info_decodes, test_sent_archive_is_foundation,
+                 test_epochless_packets, test_conflict_info_decodes, test_qso_hash_by_version,
+                 test_sent_archive_is_foundation,
                  test_session_start, test_restart_replays, test_transport_loopback,
                  test_transport_duplicates, test_transport_guards, test_transport_unreachable,
                  test_browser_token, test_browser_bridge_stops):

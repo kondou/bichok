@@ -10,7 +10,7 @@ away a packet full of QSOs because a single field changed shape.
 """
 import objc
 from Foundation import (NSObject, NSSet, NSMutableSet, NSArray, NSMutableArray, NSString, NSMutableString,
-                        NSNumber, NSDate, NSUUID, NSDictionary, NSMutableDictionary, NSNull)
+                        NSNumber, NSDate, NSUUID, NSDictionary, NSMutableDictionary, NSNull, NSData)
 
 NSSecureCoding = objc.protocolNamed('NSSecureCoding')
 
@@ -183,6 +183,13 @@ _FORMATTERS = [OperatorsFormatter, BooleanFormatter, FrequencyFormatter, SerialI
 _QSO_DICTIONARY = NSSet.setWithArray_([NSDictionary, NSMutableDictionary, NSArray, NSMutableArray,
                                        NSString, NSNumber, NSDate, NSNull] + _FORMATTERS)
 
+# What a QSO's transmitterNumber may be. Only nil has been seen so far, so the type is not known;
+# any plain value is accepted, since a class missing here would cost the whole packet, not the field.
+_TRANSMITTER = NSSet.setWithArray_([NSNumber, NSString, NSDate, NSData, NSUUID])
+
+# The key SkookumLogger 6.1(19) added to a QSO. Its presence also tells which QSO hash applies.
+TRANSMITTER_NUMBER = 'transmitterNumber'
+
 
 class TransientQso(NSObject, protocols=[NSSecureCoding]):
     """A single QSO as it travels over SkookumNet.
@@ -215,6 +222,12 @@ class TransientQso(NSObject, protocols=[NSSecureCoding]):
         self.vectorClock = _decode(decoder, _QSO_DICTIONARY, 'vectorClock')
         self.conflictInfo = _decode(decoder, _QSO_DICTIONARY, 'conflictInfo')
         self.lastModifiedBy = _decode(decoder, _STRING, 'lastModifiedBy', '')
+
+        # SkookumLogger 6.1(19) writes this key even when it is nil, and earlier versions never
+        # write it at all -- so whether it is there says which QSO hash applies (see qso_hash).
+        self.carries_transmitter_number = bool(decoder.containsValueForKey_(TRANSMITTER_NUMBER))
+        self.transmitterNumber = (_decode(decoder, _TRANSMITTER, TRANSMITTER_NUMBER)
+                                  if self.carries_transmitter_number else None)
         return self
 
     def encodeWithCoder_(self, coder):
@@ -235,19 +248,29 @@ class TransientQso(NSObject, protocols=[NSSecureCoding]):
         coder.encodeObject_forKey_(self.vectorClock, 'vectorClock')
         coder.encodeObject_forKey_(self.conflictInfo, 'conflictInfo')
         coder.encodeObject_forKey_(self.lastModifiedBy, 'lastModifiedBy')
+        if getattr(self, 'carries_transmitter_number', False):
+            coder.encodeObject_forKey_(archivable(self.transmitterNumber), TRANSMITTER_NUMBER)
 
     def qso_hash(self):
         """The per-QSO hash SkookumLogger compares logs with.
 
         Constants and field order follow the example client, which we read with its author's
-        permission; the code is our own. Note that transmitFrequency is not part of the hash.
+        permission; the code is our own. Up to SkookumLogger 6.1(17) transmitFrequency is not part
+        of the hash. 6.1(19) puts it in after subReceiveFrequency and appends the new
+        transmitterNumber, nil counting as 0 -- measured against the hashes 6.1(19) advertised over
+        a fill, a new QSO, an edit and a deletion. A QSO carrying the transmitterNumber key was
+        written by that version and is hashed its way; one without it, the earlier way.
         """
-        result = 1
-        for field_hash in (
+        newer = getattr(self, 'carries_transmitter_number', False)
+        fields = [
             _field_hash(self.identifier),
             _field_hash(self.timeStamp),
             _field_hash(self.mainReceiveFrequency),
             _field_hash(self.subReceiveFrequency),
+        ]
+        if newer:
+            fields.append(_field_hash(self.transmitFrequency))
+        fields += [
             _field_hash(self.mode),
             self.sentExchange.exchange_as_data().hash() if self.sentExchange is not None else 0,
             self.receivedExchange.exchange_as_data().hash() if self.receivedExchange is not None else 0,
@@ -259,7 +282,12 @@ class TransientQso(NSObject, protocols=[NSSecureCoding]):
             _field_hash(self.vectorClock),
             0 if self.conflictInfo is None else self.conflictInfo.hash(),
             _field_hash(self.lastModifiedBy),
-        ):
+        ]
+        if newer:
+            fields.append(_field_hash(self.transmitterNumber))
+
+        result = 1
+        for field_hash in fields:
             mixed = (result + field_hash) & _HASH_MASK
             mixed = (43 * mixed) & _HASH_MASK
             result = (result + mixed) & _HASH_MASK

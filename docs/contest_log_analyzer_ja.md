@@ -827,7 +827,7 @@ iPhone（Safari）等で利用可能。縦・横いずれの向きでも動作�
 
 ## ライセンス
 
-BicHok version 1.1.1  
+BicHok version 1.1.2  
 Copyright © 2026 kondou  
 MIT License にて公開。
 
