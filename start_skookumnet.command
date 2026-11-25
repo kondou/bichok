@@ -10,6 +10,37 @@ if ! command -v uv &>/dev/null; then
   exit 1
 fi
 
+# 動いているブリッジがあれば止めてから起動する（ページへの配信ポートは 1 つのブリッジしか使えない）。
+# 別のフォルダ（古い版かもしれない）のブリッジを黙って止めないよう、止める相手の場所と版を表示する。
+# 場所はプロセスの作業フォルダから調べるので、稼働中にフォルダ名を変えていれば変更後の名前が出る。
+bridge_folder() {
+  local pid=$1 cwd script
+  cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')
+  script=$(ps -o args= -p "$pid" | tr ' ' '\n' | grep 'bichok_bridge\.py$' | head -n 1)
+  [ -n "$cwd" ] && [ -n "$script" ] || return 0   # 調べる間に終わったプロセス
+  case "$script" in
+    /*) ;;
+    *) script="$cwd/$script" ;;
+  esac
+  (cd "$(dirname "$script")/.." 2>/dev/null && pwd -P)
+}
+folder_version() {
+  local version
+  version=$(sed -n "s/^[[:space:]]*const APP_VERSION = '\([^']*\)';.*/\1/p" "$1/contest_log_analyzer.html" 2>/dev/null | head -n 1)
+  echo "${version:-不明}"
+}
+HERE=$(pwd -P)
+RUNNING=$(for pid in $(pgrep -f "bichok_bridge.py"); do bridge_folder "$pid"; done | sort -u)
+if [ -n "$RUNNING" ]; then
+  while IFS= read -r folder; do
+    [ -n "$folder" ] || continue
+    echo "動いているブリッジを止めます: ${folder}（版 $(folder_version "$folder")）"
+    if [ "$folder" != "$HERE" ]; then
+      echo "  ※ ここ（${HERE}、版 $(folder_version "$HERE")）とは別のフォルダの BicHok です"
+    fi
+  done <<< "$RUNNING"
+fi
+
 pkill -f "bichok_bridge.py" 2>/dev/null
 sleep 0.3
 

@@ -572,7 +572,9 @@ SkookumLogger の QSO 情報をリアルタイムで受信して表示。BicHok 
 2. ブリッジ（`bridge/bichok_bridge.py`）が起動する
 3. `contest_log_analyzer.html` がブラウザで開く
 
-起動したターミナルウィンドウを閉じるとブリッジも停止する。ブリッジの動作ログは `bridge/bichok-bridge.log`。
+起動したターミナルウィンドウを閉じるとブリッジも停止する。ブリッジの動作ログは `bridge/bichok-bridge.log`（1 行目に版と起動したフォルダが記録される）。
+
+すでにブリッジが動いている場合は、それを止めてから起動する。別のフォルダのブリッジでも止めるので、止めた相手の場所と版をターミナルに表示する。
 
 コマンドラインから直接起動する場合:
 
@@ -827,7 +829,7 @@ iPhone（Safari）等で利用可能。縦・横いずれの向きでも動作�
 
 ## ライセンス
 
-BicHok version 1.1.2  
+BicHok version 1.1.3  
 Copyright © 2026 kondou  
 MIT License にて公開。
 

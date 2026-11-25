@@ -1513,7 +1513,11 @@ into a temporary environment — the first run takes a while.</li>
 <li><code>contest_log_analyzer.html</code> opens in your browser.</li>
 </ol>
 <p>Closing the terminal window that opened also stops the bridge. The
-bridge writes its own log to <code>bridge/bichok-bridge.log</code>.</p>
+bridge writes its own log to <code>bridge/bichok-bridge.log</code>; its
+first line gives the version and the folder it was started from.</p>
+<p>If a bridge is already running, it is stopped first — even one from
+another folder — and the terminal shows where that bridge was and which
+version it was.</p>
 <p>To start it from the command line instead:</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run <span class="at">--no-project</span> <span class="at">--python</span> 3.13 <span class="dt">\</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--with</span> pyobjc-framework-Cocoa <span class="at">--with</span> websockets <span class="dt">\</span></span>
@@ -1982,7 +1986,7 @@ both portrait and landscape orientations.</p>
 </blockquote>
 <hr />
 <h2 id="license">License</h2>
-<p>BicHok version 1.1.2<br />
+<p>BicHok version 1.1.3<br />
 Copyright © 2026 kondou<br />
 Released under the MIT License.</p>
 <pre><code>Permission is hereby granted, free of charge, to any person obtaining a copy

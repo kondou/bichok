@@ -573,7 +573,9 @@ Double-click `start_skookumnet.command`. This does everything at once:
 2. The bridge (`bridge/bichok_bridge.py`) starts.
 3. `contest_log_analyzer.html` opens in your browser.
 
-Closing the terminal window that opened also stops the bridge. The bridge writes its own log to `bridge/bichok-bridge.log`.
+Closing the terminal window that opened also stops the bridge. The bridge writes its own log to `bridge/bichok-bridge.log`; its first line gives the version and the folder it was started from.
+
+If a bridge is already running, it is stopped first — even one from another folder — and the terminal shows where that bridge was and which version it was.
 
 To start it from the command line instead:
 
@@ -827,7 +829,7 @@ When the Pane View is active, a **▲ Hide** button appears at the bottom-left o
 
 ## License
 
-BicHok version 1.1.2  
+BicHok version 1.1.3  
 Copyright © 2026 kondou  
 Released under the MIT License.
 

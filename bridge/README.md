@@ -131,7 +131,8 @@ other SkookumNet client.
 
     bichok_bridge.py    start-up and command line
     selftest.py         checks the merge rules against the published examples, the QSO hashes,
-                        the transport, the browser token, and stopping the browser bridge
+                        the transport, the browser token, stopping the browser bridge, the
+                        version the log names, and the signals that stop the bridge
     snet/protocol.py    constants, tags, flag bits, packet layout
     snet/bonjour.py     advertising and finding stations through the system DNS-SD library
     snet/transport.py   the TCP connections, their frames and hellos

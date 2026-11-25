@@ -1200,6 +1200,75 @@ def test_browser_bridge_stops():
         root.removeHandler(capture)
 
 
+def test_shipped_version():
+    """The bridge names the release it came with, as the page beside it gives it."""
+    import re  # pylint: disable=import-outside-toplevel
+    import tempfile  # pylint: disable=import-outside-toplevel
+    import bichok_bridge  # pylint: disable=import-outside-toplevel
+    print('Version in the log')
+    reader = getattr(bichok_bridge, 'shipped_version', None)
+    check('the bridge can read its version', callable(reader), True)
+    if not callable(reader):
+        return
+    with open(os.path.join(bichok_bridge.PAGE_FOLDER, bichok_bridge.PAGE_FILE), encoding='utf-8') as page:
+        expected = re.search(r"const APP_VERSION = '([^']+)';", page.read()).group(1)
+    check("it is the page's APP_VERSION", reader(bichok_bridge.PAGE_FOLDER), expected)
+    with tempfile.TemporaryDirectory() as folder:
+        check('a folder without the page gives none', reader(folder), None)
+        with open(os.path.join(folder, bichok_bridge.PAGE_FILE), 'w', encoding='utf-8') as page:
+            page.write("<script>\nconst APP_VERSIONS = '9.9.9';\nconst OTHER = '1';\n</script>\n")
+        check('nor does a page without the line', reader(folder), None)
+        with open(os.path.join(folder, bichok_bridge.PAGE_FILE), 'w', encoding='utf-8') as page:
+            page.write("<script>\n  const APP_VERSION = '9.8.7';\n</script>\n")
+        check('an indented line is read', reader(folder), '9.8.7')
+
+
+def test_stop_signals():
+    """SIGTERM (the launcher's pkill) and SIGHUP (the window closing) stop the run loop the way
+    Ctrl-C does, and the log names the one that came. Run last: the handlers stay installed."""
+    import signal  # pylint: disable=import-outside-toplevel
+    from PyObjCTools import AppHelper, MachSignals  # pylint: disable=import-outside-toplevel
+    import bichok_bridge  # pylint: disable=import-outside-toplevel
+    print('Stop signals')
+    installer = getattr(bichok_bridge, 'stop_on_signals', None)
+    check('the bridge handles stop signals', callable(installer), True)
+    if not callable(installer):
+        return
+
+    class Lines(logging.Handler):
+        """Keeps what is logged."""
+        def __init__(self):
+            super().__init__()
+            self.lines = []
+
+        def emit(self, record):
+            self.lines.append(record.getMessage())
+
+    root = logging.getLogger()
+    for signum in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+        name = signal.Signals(signum).name
+        installer()
+        if MachSignals.getsignal(signum) is None:
+            # Sending it now would end this process instead of failing the check.
+            check(f'{name} is handled', False, True)
+            continue
+        lines = Lines()
+        root.addHandler(lines)
+        level = root.level
+        root.setLevel(logging.INFO)
+        try:
+            threading.Timer(0.2, os.kill, (os.getpid(), signum)).start()
+            AppHelper.callLater(5.0, AppHelper.stopEventLoop)  # in case the signal does nothing
+            started = time.monotonic()
+            AppHelper.runConsoleEventLoop(maxTimeout=0.5)
+            elapsed = time.monotonic() - started
+        finally:
+            root.removeHandler(lines)
+            root.setLevel(level)
+        check(f'{name} ends the run loop', elapsed < 4.0, True)
+        check(f'and the log says so', f'Stopping on {name}' in lines.lines, True)
+
+
 def main():
     """Run every check and report."""
     for test in (test_clock_relationships, test_example_one, test_example_three,
@@ -1213,7 +1282,8 @@ def main():
                  test_sent_archive_is_foundation,
                  test_session_start, test_restart_replays, test_transport_loopback,
                  test_transport_duplicates, test_transport_guards, test_transport_unreachable,
-                 test_browser_token, test_browser_bridge_stops):
+                 test_browser_token, test_browser_bridge_stops, test_shipped_version,
+                 test_stop_signals):
         test()
 
     print()

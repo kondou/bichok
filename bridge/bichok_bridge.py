@@ -11,9 +11,11 @@ could change another station's log.
 import argparse
 import logging
 import os
+import re
+import signal
 import sys
 
-from PyObjCTools import AppHelper
+from PyObjCTools import AppHelper, MachSignals
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 
@@ -26,6 +28,15 @@ DEFAULT_LOG = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bichok-
 
 # Where the analyser page lives: the folder above this one. The browser token is left there.
 PAGE_FOLDER = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
+# The page carries the release's version number, and nothing else does: the bridge reads it from
+# there rather than keeping a copy that a release could forget to bump.
+PAGE_FILE = 'contest_log_analyzer.html'
+_VERSION_LINE = re.compile(r"\s*const APP_VERSION = '([^']+)';")
+
+# The ways a bridge is told to stop: Ctrl-C in its window, start_skookumnet.command's pkill
+# making room for another bridge, and its window being closed.
+STOP_SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
 
 # Deliberately not the machine's station name: SkookumLogger derives that from the host name, and
 # this bridge usually runs on the same Mac, so reusing it would collide with SkookumLogger itself.
@@ -71,10 +82,50 @@ def configure_logging(arguments):
                         handlers=handlers)
 
 
+def shipped_version(folder):
+    """The BicHok release in `folder`, read from its page; None when the page is not there."""
+    try:
+        with open(os.path.join(folder, PAGE_FILE), encoding='utf-8') as page:
+            for line in page:
+                match = _VERSION_LINE.match(line)
+                if match:
+                    return match.group(1)
+    except OSError:
+        pass
+    return None
+
+
+def stop_on_signals():
+    """Make every one of STOP_SIGNALS end the run loop the way Ctrl-C does, and log which came.
+
+    SIGTERM and SIGHUP would otherwise end the process on the spot, leaving no word in the log
+    that the bridge had stopped at all, let alone why -- and a bridge from another copy of BicHok
+    can be stopped that way by the launcher without its operator noticing. Handled here, each
+    goes out through main()'s cleanup like Ctrl-C. The handlers run on the Cocoa run loop (a
+    plain Python handler does not reliably get to run while the loop sits in Cocoa), and a
+    signal arriving during the cleanup that follows waits there unanswered instead of cutting
+    it short.
+    """
+    stopping = []
+
+    def stop(signum):
+        if not stopping:
+            stopping.append(signum)
+            logging.info("Stopping on %s", signal.Signals(signum).name)
+        AppHelper.stopEventLoop()
+
+    for signum in STOP_SIGNALS:
+        MachSignals.signal(signum, stop)
+
+
 def main():
-    """Start the browser bridge and the SkookumNet peer, then run until interrupted."""
+    """Start the browser bridge and the SkookumNet peer, then run until told to stop."""
     arguments = parse_arguments()
     configure_logging(arguments)
+    # First, so that any log says which copy of BicHok wrote it. The folder is the one it was
+    # started from; renaming it later does not change this line.
+    logging.info("BicHok %s bridge starting in %s (pid %d)",
+                 shipped_version(PAGE_FOLDER) or '(version unknown)', PAGE_FOLDER, os.getpid())
 
     name = arguments.name
     logging.info("Joining SkookumNet as %s on %s", name, arguments.service)
@@ -96,8 +147,9 @@ def main():
     peer.transport = transport
     transport.start()
 
+    stop_on_signals()
     try:
-        AppHelper.runConsoleEventLoop(installInterrupt=True)
+        AppHelper.runConsoleEventLoop()
     finally:
         transport.stop()
         bridge.stop()
